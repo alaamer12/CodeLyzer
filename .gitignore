@@ -13,6 +13,7 @@ desktop.ini
 *.sln
 *.swp
 *~
+.idea/*
 
 # Build Output
 node_modules/
