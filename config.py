@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
+
+import platform
 from typing import Dict, List
 from rich.console import Console
 
@@ -134,3 +136,11 @@ class ProjectMetrics:
     analysis_duration: float = 0.0
     project_size: int = 0
     git_stats: Dict = field(default_factory=dict)
+
+
+# Constants for file processing
+FILE_SIZE_LIMIT = 10 * 1024 * 1024  # 10MB
+TIMEOUT_SECONDS = 5  # seconds
+MAX_REPO_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
+IS_WINDOWS = platform.system() == 'Windows'
+
