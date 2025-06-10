@@ -10,7 +10,7 @@ from rich import box
 from core import AdvancedCodeAnalyzer, create_summary_panel, create_language_distribution_table, \
     create_complexity_table, create_hotspots_table, create_dependencies_table, export_json_report
 from config import LANGUAGE_CONFIGS, console
-from _html import generate_html_report
+from _html import generate_direct_html
 
 app = typer.Typer(
     name="codelyzer",
@@ -114,7 +114,14 @@ def generate_reports(metrics, output_format: str, output_dir: str, project_path:
         output_path.mkdir(exist_ok=True)
 
         html_file = output_path / f"{project_path.name}_analysis.html"
-        generate_html_report(metrics, str(html_file))
+        
+        # Generate HTML content using our direct method
+        html_content = generate_direct_html(metrics)
+        
+        # Write to file
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+            
         console.print(f"[green]✅ HTML report saved:[/green] [link]{html_file}[/link]")
 
     if output_format in ["json", "all"]:
