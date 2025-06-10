@@ -9,20 +9,68 @@ import os
 import ast
 import json
 import time
+import platform
+import threading
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 import re
 import math
 from rich.table import Table
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.markdown import Markdown
 from rich import box
 from datetime import datetime
 
 from config import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_FILES, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, ComplexityLevel, console
 
+# Constants for file processing
+FILE_SIZE_LIMIT = 5 * 1024 * 1024  # 5MB limit for files
+TIMEOUT_SECONDS = 10  # Timeout in seconds for file analysis
+IS_WINDOWS = platform.system() == 'Windows'
 
+class TimeoutError(Exception):
+    """Exception raised when a function times out."""
+    pass
+
+# Thread-based timeout for all platforms
+class FunctionWithTimeout:
+    def __init__(self, timeout=TIMEOUT_SECONDS):
+        self.timeout = timeout
+        self.result = None
+        self.exception = None
+        self._thread = None
+        
+    def run_with_timeout(self, func, *args, **kwargs):
+        """Run a function with a timeout using thread-based approach (all platforms)"""
+        self.exception = None
+        self.result = None
+        
+        def worker():
+            try:
+                self.result = func(*args, **kwargs)
+            except Exception as e:
+                self.exception = e
+        
+        # Create and start the thread        
+        self._thread = threading.Thread(target=worker, daemon=True)
+        self._thread.daemon = True  # Ensure thread doesn't prevent program exit
+        self._thread.start()
+        
+        # Wait with timeout and check if thread is still running
+        self._thread.join(self.timeout)
+        
+        if self._thread.is_alive():
+            # Thread is still running after timeout
+            # Note: We can't forcibly terminate a thread in Python, but marking as daemon
+            # ensures it won't prevent program exit
+            return TimeoutError("Operation timed out")
+        
+        if self.exception:
+            # Re-raise any exception that occurred in the thread
+            return self.exception
+            
+        return self.result
 
 class AdvancedCodeAnalyzer:
     """Advanced code analyzer with multi-language support"""
@@ -107,50 +155,99 @@ class AdvancedCodeAnalyzer:
     def analyze_python_file(self, file_path: str) -> Optional[FileMetrics]:
         """Analyze Python file using AST"""
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
+            # Check file size first to avoid hanging on massive files
+            file_size = os.path.getsize(file_path)
+            if file_size > FILE_SIZE_LIMIT:
+                # No console output for large files
+                metrics = FileMetrics(file_path=file_path, language='python')
+                metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
+                return metrics
             
-            # Parse AST
             try:
-                tree = ast.parse(content, filename=file_path)
-            except SyntaxError:
-                return None
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+            except Exception:
+                # Silently handle read errors
+                metrics = FileMetrics(file_path=file_path, language='python')
+                metrics.loc = metrics.sloc = 0
+                return metrics
             
+            # Parse AST with thread-based timeout
+            # Define a function to parse the AST
+            def parse_ast():
+                try:
+                    return ast.parse(content, filename=file_path)
+                except SyntaxError as e:
+                    return e
+                except Exception as e:
+                    return e
+            
+            # Use thread-based timeout
+            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
+            tree_result = timeout_runner.run_with_timeout(parse_ast)
+            
+            if isinstance(tree_result, TimeoutError):
+                # Create basic metrics without console output
+                metrics = FileMetrics(file_path=file_path, language='python')
+                lines = content.count('\n') + 1
+                metrics.loc = metrics.sloc = lines
+                return metrics
+            elif isinstance(tree_result, SyntaxError):
+                # Create basic metrics for files with syntax errors without console output
+                metrics = FileMetrics(file_path=file_path, language='python')
+                lines = content.count('\n') + 1
+                metrics.loc = metrics.sloc = lines
+                return metrics
+            elif isinstance(tree_result, Exception):
+                # Create basic metrics without console output
+                metrics = FileMetrics(file_path=file_path, language='python')
+                lines = content.count('\n') + 1
+                metrics.loc = metrics.sloc = lines
+                return metrics
+            
+            tree = tree_result
             metrics = FileMetrics(file_path=file_path, language='python')
             
             # Count AST nodes
-            classes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
-            functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
-            
-            metrics.classes = len(classes)
-            metrics.functions = len(functions)
-            
-            # Methods per class
-            for cls in classes:
-                methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
-                metrics.methods_per_class[cls.name] = len(methods)
-                metrics.methods += len(methods)
-            
-            # Imports
-            imports = set()
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        imports.add(alias.name.split('.')[0])
-                elif isinstance(node, ast.ImportFrom):
-                    if node.module:
-                        imports.add(node.module.split('.')[0])
-            
-            metrics.imports = sorted(imports)
-            
-            # Cyclomatic complexity
-            metrics.cyclomatic_complexity = self._calculate_cyclomatic_complexity(tree)
+            try:
+                classes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
+                functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
+                
+                metrics.classes = len(classes)
+                metrics.functions = len(functions)
+                
+                # Methods per class
+                for cls in classes:
+                    methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
+                    metrics.methods_per_class[cls.name] = len(methods)
+                    metrics.methods += len(methods)
+                
+                # Imports
+                imports = set()
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            imports.add(alias.name.split('.')[0])
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module:
+                            imports.add(node.module.split('.')[0])
+                
+                metrics.imports = sorted(imports)
+                
+                # Cyclomatic complexity
+                metrics.cyclomatic_complexity = self._calculate_cyclomatic_complexity(tree)
+            except Exception:
+                # Fill with default values without console output
+                lines = content.count('\n') + 1
+                metrics.loc = metrics.sloc = lines
             
             return metrics
             
-        except Exception as e:
-            console.print(f"[red]Error analyzing {file_path}: {e}[/red]")
-            return None
+        except Exception:
+            # Return minimal metrics object rather than None, without console output
+            metrics = FileMetrics(file_path=file_path, language='python')
+            metrics.loc = metrics.sloc = 0
+            return metrics
     
     def _calculate_cyclomatic_complexity(self, tree: ast.AST) -> int:
         """Calculate cyclomatic complexity for Python AST"""
@@ -171,61 +268,129 @@ class AdvancedCodeAnalyzer:
     def analyze_generic_file(self, file_path: str, language: str) -> Optional[FileMetrics]:
         """Analyze non-Python files with generic patterns"""
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
+            # Check file size first to avoid hanging on massive files
+            file_size = os.path.getsize(file_path)
+            if file_size > FILE_SIZE_LIMIT:
+                # No console output for large files
+                metrics = FileMetrics(file_path=file_path, language=language)
+                metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
+                return metrics
             
             metrics = FileMetrics(file_path=file_path, language=language)
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+            except Exception:
+                # Create basic metrics without console output
+                metrics.loc = metrics.sloc = 0
+                return metrics
+            
             config = LANGUAGE_CONFIGS.get(language, LANGUAGE_CONFIGS['python'])
             
-            # Count keywords/patterns
-            for keyword in config['keywords']:
-                pattern = rf'\b{keyword}\b'
-                matches = re.findall(pattern, content, re.IGNORECASE)
-                
-                if keyword in ['def', 'function', 'func', 'fn']:
-                    metrics.functions += len(matches)
-                elif keyword in ['class', 'struct', 'interface']:
-                    metrics.classes += len(matches)
+            # Pattern matching with thread-based timeout
+            def pattern_matching():
+                try:
+                    patterns_found = 0
+                    for keyword in config['keywords']:
+                        pattern = rf'\b{keyword}\b'
+                        matches = re.findall(pattern, content, re.IGNORECASE)
+                        patterns_found += len(matches)
+                        
+                        if keyword in ['def', 'function', 'func', 'fn']:
+                            metrics.functions += len(matches)
+                        elif keyword in ['class', 'struct', 'interface']:
+                            metrics.classes += len(matches)
+                    return patterns_found
+                except Exception:
+                    return 0
             
+            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
+            result = timeout_runner.run_with_timeout(pattern_matching)
+            
+            if isinstance(result, TimeoutError) or isinstance(result, Exception):
+                # Count lines as fallback without console output
+                try:
+                    lines = content.count('\n') + 1
+                    metrics.loc = metrics.sloc = lines
+                except Exception:
+                    metrics.loc = metrics.sloc = 0
+                return metrics
+            
+            # Count lines manually
+            try:
+                lines = content.count('\n') + 1
+                metrics.loc = metrics.sloc = lines
+            except Exception:
+                metrics.loc = metrics.sloc = 0
+            
+            # If no errors, return metrics
             return metrics
             
-        except Exception as e:
-            console.print(f"[red]Error analyzing {file_path}: {e}[/red]")
-            return None
+        except Exception:
+            # Return minimal metrics object without console output
+            metrics = FileMetrics(file_path=file_path, language=language)
+            metrics.loc = metrics.sloc = 0
+            return metrics
     
     def count_lines(self, file_path: str, language: str) -> Tuple[int, int, int, int]:
         """Count different types of lines in a file"""
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()
+            # Check file size first to avoid hanging on massive files
+            try:
+                file_size = os.path.getsize(file_path)
+            except OSError:
+                return 0, 0, 0, 0
+
+            if file_size > FILE_SIZE_LIMIT:
+                # Provide rough estimates for large files without console output
+                total_lines = file_size // 50  # Approx 50 bytes per line as rough estimate
+                source_lines = int(total_lines * 0.7)  # Estimate 70% of lines are source code
+                comment_lines = int(total_lines * 0.2)  # Estimate 20% are comments
+                blank_lines = total_lines - source_lines - comment_lines  # Remaining are blank
+                return total_lines, source_lines, comment_lines, blank_lines
             
-            total_lines = len(lines)
+            # For normal-sized files, count lines with thread-based timeout
+            total_lines = 0
             blank_lines = 0
             comment_lines = 0
-            source_lines = 0
             
             config = LANGUAGE_CONFIGS.get(language, LANGUAGE_CONFIGS['python'])
-            comment_patterns = [re.compile(pattern, re.MULTILINE) for pattern in config['comment_patterns']]
+            comment_patterns = [re.compile(pattern) for pattern in config['comment_patterns']]
             
-            content = ''.join(lines)
+            def count_file_lines():
+                nonlocal total_lines, blank_lines, comment_lines
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        for line in f:
+                            total_lines += 1
+                            stripped = line.strip()
+                            if not stripped:
+                                blank_lines += 1
+                            elif any(pattern.match(stripped) for pattern in comment_patterns):
+                                comment_lines += 1
+                    return True
+                except Exception:
+                    return False
             
-            # Remove comments
-            for pattern in comment_patterns:
-                content = pattern.sub('', content)
+            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
+            result = timeout_runner.run_with_timeout(count_file_lines)
             
-            # Count lines
-            for line in lines:
-                stripped = line.strip()
-                if not stripped:
-                    blank_lines += 1
-                elif any(pattern.match(stripped) for pattern in comment_patterns):
-                    comment_lines += 1
-                else:
-                    source_lines += 1
+            if result is False or isinstance(result, Exception) or isinstance(result, TimeoutError):
+                # Provide rough estimates without console output
+                total_lines = file_size // 50
+                source_lines = int(total_lines * 0.7)
+                comment_lines = int(total_lines * 0.2)
+                blank_lines = total_lines - source_lines - comment_lines
+                return total_lines, source_lines, comment_lines, blank_lines
+            
+            # Calculate source lines
+            source_lines = total_lines - blank_lines - comment_lines
             
             return total_lines, source_lines, comment_lines, blank_lines
             
         except Exception:
+            # Return zeros without console output
             return 0, 0, 0, 0
     
     def detect_security_issues(self, content: str) -> List[str]:
@@ -248,63 +413,125 @@ class AdvancedCodeAnalyzer:
     
     def analyze_file(self, file_path: str) -> Optional[FileMetrics]:
         """Analyze a single file"""
-        if self.should_exclude_file(file_path):
-            return None
-        
-        language = self.detect_language(file_path)
-        if not language:
-            return None
-        
-        # Get file stats
         try:
-            stat = os.stat(file_path)
-            file_size = stat.st_size
-            last_modified = stat.st_mtime
-        except OSError:
-            file_size = 0
-            last_modified = 0.0
+            if self.should_exclude_file(file_path):
+                return None
+            
+            language = self.detect_language(file_path)
+            if not language:
+                return None
+            
+            # Get file stats
+            try:
+                stat = os.stat(file_path)
+                file_size = stat.st_size
+                last_modified = stat.st_mtime
+            except OSError:
+                file_size = 0
+                last_modified = 0.0
+            
+            # Create basic metrics object
+            metrics = FileMetrics(file_path=file_path, language=language)
+            metrics.file_size = file_size
+            metrics.last_modified = last_modified
+            
+            # Check file size first to avoid hanging on massive files
+            if file_size > FILE_SIZE_LIMIT:
+                console.print(f"[yellow]Warning: Large file {file_path} ({file_size / 1024 / 1024:.1f} MB), using basic metrics[/yellow]")
+                metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
+                return metrics
+            
+            # Analyze based on language
+            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
+            
+            if language == 'python':
+                result = timeout_runner.run_with_timeout(self.analyze_python_file, file_path)
+            else:
+                result = timeout_runner.run_with_timeout(self.analyze_generic_file, file_path, language)
+            
+            if isinstance(result, TimeoutError):
+                console.print(f"[yellow]Warning: Analysis timed out for {file_path}, using basic metrics[/yellow]")
+                # Fill in count_lines data at minimum
+                try:
+                    total, source, comments, blanks = self.count_lines(file_path, language)
+                    metrics.loc = total
+                    metrics.sloc = source
+                    metrics.comments = comments
+                    metrics.blanks = blanks
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Failed to count lines in {file_path}: {str(e)}[/yellow]")
+                return metrics
+            elif isinstance(result, Exception):
+                console.print(f"[yellow]Warning: Error analyzing {file_path}: {str(result)}[/yellow]")
+                return metrics
+            
+            # If analysis succeeded, use the detailed metrics
+            if result:
+                metrics = result
+            
+            # Count lines if not already set
+            if metrics.loc == 0:
+                try:
+                    total, source, comments, blanks = self.count_lines(file_path, language)
+                    metrics.loc = total
+                    metrics.sloc = source
+                    metrics.comments = comments
+                    metrics.blanks = blanks
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Failed to count lines in {file_path}: {str(e)}[/yellow]")
+            
+            # Security and quality analysis (with timeouts)
+            try:
+                def security_analysis():
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                        return (self.detect_security_issues(content),
+                                self.detect_code_smells(content))
+                    except Exception as e:
+                        console.print(f"[yellow]Warning: Error in security analysis for {file_path}: {str(e)}[/yellow]")
+                        return [], []
+                
+                timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS // 2)  # Use shorter timeout
+                security_result = timeout_runner.run_with_timeout(security_analysis)
+                
+                if isinstance(security_result, Exception) or isinstance(security_result, TimeoutError):
+                    console.print(f"[yellow]Warning: Security analysis timed out for {file_path}[/yellow]")
+                else:
+                    security_issues, code_smells = security_result
+                    metrics.security_issues = security_issues
+                    metrics.code_smells = code_smells
+            except Exception:
+                pass
+            
+            # Calculate complexity metrics
+            try:
+                config = LANGUAGE_CONFIGS.get(language, LANGUAGE_CONFIGS['python'])
+                weights = config['complexity_weights']
+                
+                metrics.complexity_score = (
+                    metrics.sloc * weights['loc'] +
+                    metrics.classes * weights['classes'] +
+                    metrics.functions * weights['functions'] +
+                    metrics.methods * weights['methods']
+                )
+                
+                # Maintainability index (simplified)
+                if metrics.sloc > 0:
+                    metrics.maintainability_index = max(0, 171 - 5.2 * math.log(metrics.sloc) - 
+                                                    0.23 * (metrics.cyclomatic_complexity or 1) - 
+                                                    16.2 * math.log(max(1, len(metrics.imports or []))))
+            except Exception as e:
+                console.print(f"[yellow]Warning: Error calculating complexity metrics for {file_path}: {str(e)}[/yellow]")
+            
+            return metrics
         
-        # Analyze based on language
-        if language == 'python':
-            metrics = self.analyze_python_file(file_path)
-        else:
-            metrics = self.analyze_generic_file(file_path, language)
-        
-        if not metrics:
-            return None
-        
-        # Count lines
-        metrics.loc, metrics.sloc, metrics.comments, metrics.blanks = self.count_lines(file_path, language)
-        metrics.file_size = file_size
-        metrics.last_modified = last_modified
-        
-        # Security and quality analysis
-        try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-            metrics.security_issues = self.detect_security_issues(content)
-            metrics.code_smells = self.detect_code_smells(content)
-        except Exception:
-            pass
-        
-        # Calculate complexity metrics
-        config = LANGUAGE_CONFIGS.get(language, LANGUAGE_CONFIGS['python'])
-        weights = config['complexity_weights']
-        
-        metrics.complexity_score = (
-            metrics.sloc * weights['loc'] +
-            metrics.classes * weights['classes'] +
-            metrics.functions * weights['functions'] +
-            metrics.methods * weights['methods']
-        )
-        
-        # Maintainability index (simplified)
-        if metrics.sloc > 0:
-            metrics.maintainability_index = max(0, 171 - 5.2 * math.log(metrics.sloc) - 
-                                               0.23 * metrics.cyclomatic_complexity - 
-                                               16.2 * math.log(max(1, len(metrics.imports))))
-        
-        return metrics
+        except Exception as e:
+            console.print(f"[red]Error analyzing {file_path}: {str(e)}[/red]")
+            # Return minimal metrics object rather than None
+            metrics = FileMetrics(file_path=file_path, language=language if 'language' in locals() else 'unknown')
+            metrics.loc = metrics.sloc = 0
+            return metrics
     
     def analyze_project(self, project_path: str) -> ProjectMetrics:
         """Analyze entire project"""
@@ -312,6 +539,7 @@ class AdvancedCodeAnalyzer:
         project_metrics = ProjectMetrics()
         
         # Get all files
+        console.print("[bold blue]🔍 Finding files to analyze...[/bold blue]")
         all_files = []
         for root, dirs, files in os.walk(project_path):
             # Filter directories
@@ -322,42 +550,104 @@ class AdvancedCodeAnalyzer:
                 if self.detect_language(file_path) and not self.should_exclude_file(file_path):
                     all_files.append(file_path)
         
-        # Analyze files with progress
+        console.print(f"[bold green]🔍 Found {len(all_files)} files to analyze[/bold green]")
+        
+        # Set up a progress display
+        total_files = len(all_files)
+        if total_files == 0:
+            console.print("[yellow]No files to analyze[/yellow]")
+            return project_metrics
+            
         with Progress(
             SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
+            TextColumn("[bold blue]Processing...", justify="right"),
+            BarColumn(bar_width=40),
+            "[progress.percentage]{task.percentage:>3.1f}%",
+            "•",
+            TextColumn("[cyan]{task.completed}/{task.total}[/cyan]", justify="right"),
+            "•",
+            TimeElapsedColumn(),
+            "•",
+            TimeRemainingColumn(),
             console=console
         ) as progress:
+            task = progress.add_task("[cyan]Analyzing files...", total=total_files)
             
-            task = progress.add_task("🔍 Analyzing files...", total=len(all_files))
+            # Process files
+            stats_interval = max(100, total_files // 10)  # Show stats every ~10% or 100 files
+            stats_counter = 0
+            language_stats = {}
             
-            for file_path in all_files:
-                metrics = self.analyze_file(file_path)
-                if metrics:
-                    project_metrics.file_metrics.append(metrics)
-                    
-                    # Update aggregated stats
-                    project_metrics.total_files += 1
-                    project_metrics.total_loc += metrics.loc
-                    project_metrics.total_sloc += metrics.sloc
-                    project_metrics.total_comments += metrics.comments
-                    project_metrics.total_blanks += metrics.blanks
-                    project_metrics.total_classes += metrics.classes
-                    project_metrics.total_functions += metrics.functions
-                    project_metrics.total_methods += metrics.methods
-                    project_metrics.project_size += metrics.file_size
-                    
-                    # Language distribution
-                    project_metrics.languages[metrics.language] = project_metrics.languages.get(
-                        metrics.language, 0) + 1
-                    
-                    # Dependencies
-                    for imp in metrics.imports:
-                        project_metrics.dependencies[imp] = project_metrics.dependencies.get(imp, 0) + 1
+            for i, file_path in enumerate(all_files):
+                # Update progress
+                progress.update(task, advance=1, description=f"[cyan]Analyzing {os.path.basename(file_path)}")
                 
-                progress.advance(task)
+                try:
+                    # Process this file with a timeout and additional safeguards
+                    def analyze_single_file():
+                        try:
+                            return self.analyze_file(file_path)
+                        except Exception as e:
+                            console.print(f"[red]❌ Exception in analyze_file: {str(e)}[/red]")
+                            return None
+                    
+                    timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
+                    result = timeout_runner.run_with_timeout(analyze_single_file)
+                    
+                    if isinstance(result, TimeoutError):
+                        # Quietly log timeouts rather than printing to console
+                        continue
+                    elif isinstance(result, Exception):
+                        # Quietly log errors rather than printing to console
+                        continue
+                    
+                    metrics = result
+                    if metrics:
+                        project_metrics.file_metrics.append(metrics)
+                        
+                        # Update aggregated stats - add safeguards for None values
+                        project_metrics.total_files += 1
+                        project_metrics.total_loc += metrics.loc or 0
+                        project_metrics.total_sloc += metrics.sloc or 0
+                        project_metrics.total_comments += metrics.comments or 0
+                        project_metrics.total_blanks += metrics.blanks or 0
+                        project_metrics.total_classes += metrics.classes or 0
+                        project_metrics.total_functions += metrics.functions or 0
+                        project_metrics.total_methods += metrics.methods or 0
+                        project_metrics.project_size += metrics.file_size or 0
+                        
+                        # Language distribution
+                        if metrics.language:
+                            project_metrics.languages[metrics.language] = project_metrics.languages.get(
+                                metrics.language, 0) + 1
+                            language_stats[metrics.language] = language_stats.get(metrics.language, 0) + 1
+                        
+                        # Dependencies
+                        if metrics.imports:
+                            for imp in metrics.imports:
+                                project_metrics.dependencies[imp] = project_metrics.dependencies.get(imp, 0) + 1
+                        
+                        # Print occasional stats rather than per-file messages
+                        stats_counter += 1
+                        if stats_counter >= stats_interval:
+                            # Show summary stats periodically
+                            elapsed = time.time() - start_time
+                            files_per_sec = i / elapsed if elapsed > 0 else 0
+                            console.print(f"\n[bold green]📊 Progress: {i+1}/{total_files} files processed ({files_per_sec:.1f} files/sec)[/bold green]")
+                            
+                            # Show top languages
+                            if language_stats:
+                                top_langs = sorted(language_stats.items(), key=lambda x: x[1], reverse=True)[:3]
+                                lang_summary = ", ".join(f"{lang}: {count}" for lang, count in top_langs)
+                                console.print(f"[green]Top languages: {lang_summary}[/green]")
+                            
+                            stats_counter = 0
+                            
+                except Exception as e:
+                    # Continue with next file after error (without printing)
+                    continue
+        
+        console.print(f"\n[bold green]✅ Processing complete. {project_metrics.total_files} files successfully analyzed.[/bold green]")
         
         # Post-processing
         self._calculate_derived_metrics(project_metrics)
@@ -429,12 +719,20 @@ def create_summary_panel(metrics: ProjectMetrics) -> Panel:
         Markdown(summary_text),
         title="📋 Analysis Summary",
         border_style="blue",
-        padding=(1, 2)
+        padding=(1, 2),
+        title_align="center",
+        highlight=True
     )
 
 def create_language_distribution_table(metrics: ProjectMetrics) -> Table:
     """Create language distribution table"""
-    table = Table(title="🌐 Language Distribution", box=box.ROUNDED)
+    table = Table(
+        title="🌐 Language Distribution", 
+        box=box.ROUNDED,
+        title_style="bold blue",
+        border_style="cyan",
+        highlight=True
+    )
     table.add_column("Language", style="cyan", no_wrap=True)
     table.add_column("Files", justify="right", style="magenta")
     table.add_column("Percentage", justify="right", style="green")
@@ -452,7 +750,13 @@ def create_language_distribution_table(metrics: ProjectMetrics) -> Table:
 
 def create_complexity_table(metrics: ProjectMetrics) -> Table:
     """Create complexity distribution table"""
-    table = Table(title="⚡ Complexity Distribution", box=box.ROUNDED)
+    table = Table(
+        title="⚡ Complexity Distribution", 
+        box=box.ROUNDED,
+        title_style="bold blue",
+        border_style="cyan",
+        highlight=True
+    )
     table.add_column("Complexity Level", style="cyan")
     table.add_column("Files", justify="right", style="magenta")
     table.add_column("Percentage", justify="right", style="green")
@@ -481,28 +785,55 @@ def create_complexity_table(metrics: ProjectMetrics) -> Table:
 
 def create_hotspots_table(metrics: ProjectMetrics) -> Table:
     """Create code hotspots table"""
-    table = Table(title="🔥 Code Hotspots (Most Complex Files)", box=box.ROUNDED)
+    table = Table(
+        title="🔥 Code Hotspots (Most Complex Files)", 
+        box=box.ROUNDED,
+        title_style="bold blue",
+        border_style="cyan",
+        highlight=True
+    )
     table.add_column("File", style="cyan", max_width=50)
     table.add_column("Lines", justify="right", style="magenta")
     table.add_column("Complexity", justify="right", style="red")
     table.add_column("Issues", justify="right", style="yellow")
     
     for file_metrics in metrics.most_complex_files[:10]:
-        relative_path = os.path.relpath(file_metrics.file_path)
+        # Handle paths on different drives by using Path
+        try:
+            # Try relative path first
+            relative_path = os.path.relpath(file_metrics.file_path)
+        except ValueError:
+            # If on a different drive, just use the basename or full path
+            path_obj = Path(file_metrics.file_path)
+            # Use parent directory + filename for better context
+            if path_obj.parent.name:
+                relative_path = str(Path(path_obj.parent.name) / path_obj.name)
+            else:
+                relative_path = path_obj.name
+        
         issues = len(file_metrics.security_issues) + len(file_metrics.code_smells)
+        
+        # Color code based on issue count
+        issue_style = "green" if issues == 0 else "yellow" if issues < 3 else "red"
         
         table.add_row(
             relative_path,
             str(file_metrics.sloc),
             f"{file_metrics.complexity_score:.0f}",
-            str(issues) if issues > 0 else "✅"
+            f"[{issue_style}]{issues if issues > 0 else '✅'}[/{issue_style}]"
         )
     
     return table
 
 def create_dependencies_table(metrics: ProjectMetrics) -> Table:
     """Create top dependencies table"""
-    table = Table(title="📦 Top Dependencies", box=box.ROUNDED)
+    table = Table(
+        title="📦 Top Dependencies", 
+        box=box.ROUNDED,
+        title_style="bold blue",
+        border_style="cyan",
+        highlight=True
+    )
     table.add_column("Module", style="cyan")
     table.add_column("Usage Count", justify="right", style="magenta")
     
@@ -525,25 +856,25 @@ def generate_html_template():
     <title>Codebase Analysis Report</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: #f5f7fa; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 0; text-align: center; margin-bottom: 30px; border-radius: 10px; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .metric-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .metric-value { font-size: 2em; font-weight: bold; color: #667eea; }
-        .metric-label { color: #666; margin-top: 5px; }
-        .chart-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .table-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #f8f9fa; font-weight: 600; }
-        tr:hover { background-color: #f5f5f5; }
-        .complexity-low { color: #28a745; }
-        .complexity-medium { color: #ffc107; }
-        .complexity-high { color: #dc3545; }
-        .progress-bar { width: 100%; height: 20px; background-color: #e9ecef; border-radius: 10px; overflow: hidden; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #28a745, #ffc107, #dc3545); transition: width 0.3s ease; }
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: #f5f7fa; }}
+        .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 0; text-align: center; margin-bottom: 30px; border-radius: 10px; }}
+        .metrics-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }}
+        .metric-card {{ background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+        .metric-value {{ font-size: 2em; font-weight: bold; color: #667eea; }}
+        .metric-label {{ color: #666; margin-top: 5px; }}
+        .chart-container {{ background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }}
+        .table-container {{ background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
+        th {{ background-color: #f8f9fa; font-weight: 600; }}
+        tr:hover {{ background-color: #f5f5f5; }}
+        .complexity-low {{ color: #28a745; }}
+        .complexity-medium {{ color: #ffc107; }}
+        .complexity-high {{ color: #dc3545; }}
+        .progress-bar {{ width: 100%; height: 20px; background-color: #e9ecef; border-radius: 10px; overflow: hidden; }}
+        .progress-fill {{ height: 100%; background: linear-gradient(90deg, #28a745, #ffc107, #dc3545); transition: width 0.3s ease; }}
     </style>
 </head>
 <body>
@@ -597,7 +928,7 @@ def generate_html_template():
                     <tr>
                         <th>File</th>
                         <th>Lines</th>
-                        <th>Complexity Score</th>
+                        <th>Complexity</th>
                         <th>Issues</th>
                     </tr>
                 </thead>
@@ -642,7 +973,9 @@ def generate_html_template():
             options: {{
                 responsive: true,
                 plugins: {{
-                    legend: {{ position: 'bottom' }}
+                    legend: {{
+                        position: 'bottom'
+                    }}
                 }}
             }}
         }});
@@ -662,10 +995,14 @@ def generate_html_template():
             options: {{
                 responsive: true,
                 plugins: {{
-                    legend: {{ display: false }}
+                    legend: {{
+                        display: false
+                    }}
                 }},
                 scales: {{
-                    y: {{ beginAtZero: true }}
+                    y: {{
+                        beginAtZero: true
+                    }}
                 }}
             }}
         }});
@@ -682,7 +1019,19 @@ def generate_html_report(metrics: ProjectMetrics, output_path: str):
     # Complex files rows
     complex_files_rows = ""
     for file_metrics in metrics.most_complex_files[:15]:
-        relative_path = os.path.relpath(file_metrics.file_path)
+        # Handle paths on different drives by using Path
+        try:
+            # Try relative path first
+            relative_path = os.path.relpath(file_metrics.file_path)
+        except ValueError:
+            # If on a different drive, just use the basename or full path
+            path_obj = Path(file_metrics.file_path)
+            # Use parent directory + filename for better context
+            if path_obj.parent.name:
+                relative_path = str(Path(path_obj.parent.name) / path_obj.name)
+            else:
+                relative_path = path_obj.name
+                
         issues = len(file_metrics.security_issues) + len(file_metrics.code_smells)
         complexity_class = "complexity-high" if file_metrics.complexity_score > 500 else "complexity-medium" if file_metrics.complexity_score > 200 else "complexity-low"
         
@@ -720,21 +1069,53 @@ def generate_html_report(metrics: ProjectMetrics, output_path: str):
     complexity_data = [metrics.complexity_distribution.get(level, 0) for level in ComplexityLevel]
     
     # Fill template
-    html_content = html_template.format(
-        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        total_files=metrics.total_files,
-        total_loc=metrics.total_loc,
-        total_classes=metrics.total_classes,
-        total_functions=metrics.total_functions,
-        code_quality=metrics.code_quality_score,
-        maintainability=metrics.maintainability_score,
-        complex_files_rows=complex_files_rows,
-        dependencies_rows=dependencies_rows,
-        language_labels=json.dumps(language_labels),
-        language_data=json.dumps(language_data),
-        complexity_labels=json.dumps(complexity_labels),
-        complexity_data=json.dumps(complexity_data)
-    )
+    try:
+        html_content = html_template.format(
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            total_files=metrics.total_files,
+            total_loc=metrics.total_loc,
+            total_classes=metrics.total_classes,
+            total_functions=metrics.total_functions,
+            code_quality=metrics.code_quality_score,
+            maintainability=metrics.maintainability_score,
+            complex_files_rows=complex_files_rows,
+            dependencies_rows=dependencies_rows,
+            language_labels=json.dumps(language_labels),
+            language_data=json.dumps(language_data),
+            complexity_labels=json.dumps(complexity_labels),
+            complexity_data=json.dumps(complexity_data)
+        )
+    except KeyError as e:
+        # Handle template formatting error
+        console.print(f"[red]Error in HTML template formatting: {str(e)}[/red]")
+        # Create a minimal HTML report with just the summary
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Codebase Analysis Report</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; }}
+                .summary {{ padding: 20px; }}
+            </style>
+        </head>
+        <body>
+            <div class="summary">
+                <h1>Codebase Analysis Summary</h1>
+                <p>Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+                <ul>
+                    <li>Files analyzed: {metrics.total_files}</li>
+                    <li>Lines of code: {metrics.total_loc}</li>
+                    <li>Classes: {metrics.total_classes}</li>
+                    <li>Functions: {metrics.total_functions}</li>
+                    <li>Code quality: {metrics.code_quality_score:.1f}%</li>
+                    <li>Maintainability: {metrics.maintainability_score:.1f}%</li>
+                </ul>
+                <p>Note: Full report generation failed due to template error.</p>
+            </div>
+        </body>
+        </html>
+        """
     
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_content)

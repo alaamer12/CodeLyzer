@@ -55,9 +55,8 @@ def analyze(
         include_tests=include_tests
     )
     
-    # Analyze project
-    with console.status("[bold green]🔄 Analyzing codebase...") as status:
-        metrics = analyzer.analyze_project(str(project_path))
+    # Direct call to analyzer - let it handle its own progress
+    metrics = analyzer.analyze_project(str(project_path))
     
     if metrics.total_files == 0:
         console.print("[red]❌ No supported files found in the specified directory[/red]")
@@ -174,11 +173,12 @@ def compare(
     # Analyze both projects
     analyzer = AdvancedCodeAnalyzer(exclude_dirs=set(exclude) if exclude else None)
     
-    with console.status("[bold green]🔄 Analyzing first project..."):
-        metrics1 = analyzer.analyze_project(path1)
+    # Avoid nested live displays
+    console.print("[bold green]🔄 Analyzing first project...[/bold green]")
+    metrics1 = analyzer.analyze_project(path1)
     
-    with console.status("[bold green]🔄 Analyzing second project..."):
-        metrics2 = analyzer.analyze_project(path2)
+    console.print("[bold green]🔄 Analyzing second project...[/bold green]")
+    metrics2 = analyzer.analyze_project(path2)
     
     # Create comparison table
     comparison_table = Table(title="📊 Project Comparison", box=box.ROUNDED)
