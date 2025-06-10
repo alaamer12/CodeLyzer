@@ -28,6 +28,7 @@ jspm_packages/
 typings/
 *.jar
 *.war
+**/__pycache__/*
 
 # Logs and Temporary Files
 *.log
