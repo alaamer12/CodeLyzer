@@ -10,7 +10,6 @@ import ast
 import json
 import time
 import platform
-import threading
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 import re
@@ -23,51 +22,127 @@ from rich import box
 
 from config import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_FILES, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, \
     ComplexityLevel, console
+from utils import FunctionWithTimeout, TimeoutError
 
 # Constants for file processing
-FILE_SIZE_LIMIT = 5 * 1024 * 1024  # 5MB limit for files
-TIMEOUT_SECONDS = 10  # Timeout in seconds for file analysis
+FILE_SIZE_LIMIT = 10 * 1024 * 1024  # 10MB
+TIMEOUT_SECONDS = 5  # seconds
+MAX_REPO_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
 IS_WINDOWS = platform.system() == 'Windows'
 
-# Thread-based timeout for all platforms
-class FunctionWithTimeout:
-    def __init__(self, timeout=TIMEOUT_SECONDS):
-        self.timeout = timeout
-        self.result = None
-        self.exception = None
-        self._thread = None
+class PythonASTAnalyzer:
+    """Analyzer for Python files using the Abstract Syntax Tree"""
+    
+    def analyze_file(self, file_path: str) -> Optional[FileMetrics]:
+        """Analyze a Python file and return its metrics"""
+        try:
+            # Check file size first to avoid hanging on massive files
+            file_size = os.path.getsize(file_path)
+            if file_size > FILE_SIZE_LIMIT:
+                # No console output for large files
+                metrics = FileMetrics(file_path=file_path, language='python')
+                metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
+                return metrics
 
-    def run_with_timeout(self, func, *args, **kwargs):
-        """Run a function with a timeout using thread-based approach (all platforms)"""
-        self.exception = None
-        self.result = None
-
-        def worker():
             try:
-                self.result = func(*args, **kwargs)
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+            except Exception:
+                # Silently handle read errors
+                metrics = FileMetrics(file_path=file_path, language='python')
+                metrics.loc = metrics.sloc = 0
+                return metrics
+
+            # Parse AST with thread-based timeout
+            tree = self._parse_ast_with_timeout(content, file_path)
+            
+            # Handle parsing errors
+            if isinstance(tree, Exception):
+                metrics = FileMetrics(file_path=file_path, language='python')
+                lines = content.count('\n') + 1
+                metrics.loc = metrics.sloc = lines
+                return metrics
+
+            # Initialize metrics
+            metrics = FileMetrics(file_path=file_path, language='python')
+            
+            # Calculate AST-based metrics
+            try:
+                self._calculate_ast_metrics(tree, metrics)
+            except Exception:
+                # Fill with default values without console output
+                lines = content.count('\n') + 1
+                metrics.loc = metrics.sloc = lines
+
+            return metrics
+
+        except Exception:
+            # Return minimal metrics object rather than None, without console output
+            metrics = FileMetrics(file_path=file_path, language='python')
+            metrics.loc = metrics.sloc = 0
+            return metrics
+    
+    def _parse_ast_with_timeout(self, content: str, file_path: str) -> ast.AST:
+        """Parse Python code into AST with a timeout to handle large files"""
+        # Define a function to parse the AST
+        def parse_ast():
+            try:
+                return ast.parse(content, filename=file_path)
+            except SyntaxError as e:
+                return e
             except Exception as e:
-                self.exception = e
+                return e
 
-        # Create and start the thread        
-        self._thread = threading.Thread(target=worker, daemon=True)
-        self._thread.daemon = True  # Ensure thread doesn't prevent program exit
-        self._thread.start()
+        # Use thread-based timeout
+        timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
+        return timeout_runner.run_with_timeout(parse_ast)
+    
+    def _calculate_ast_metrics(self, tree: ast.AST, metrics: FileMetrics) -> None:
+        """Calculate various metrics from the AST"""
+        # Count classes and functions
+        classes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
+        functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
 
-        # Wait with timeout and check if thread is still running
-        self._thread.join(self.timeout)
+        metrics.classes = len(classes)
+        metrics.functions = len(functions)
 
-        if self._thread.is_alive():
-            # Thread is still running after timeout
-            # Note: We can't forcibly terminate a thread in Python, but marking as daemon
-            # ensures it won't prevent program exit
-            return TimeoutError("Operation timed out")
+        # Methods per class
+        for cls in classes:
+            methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
+            metrics.methods_per_class[cls.name] = len(methods)
+            metrics.methods += len(methods)
 
-        if self.exception:
-            # Re-raise any exception that occurred in the thread
-            return self.exception
+        # Imports
+        imports = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.add(alias.name.split('.')[0])
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imports.add(node.module.split('.')[0])
 
-        return self.result
+        metrics.imports = sorted(imports)
 
+        # Cyclomatic complexity
+        metrics.cyclomatic_complexity = self._calculate_cyclomatic_complexity(tree)
+    
+    def _calculate_cyclomatic_complexity(self, tree: ast.AST) -> int:
+        """Calculate cyclomatic complexity of Python code"""
+        complexity = 1  # Base complexity
+        
+        # Count branches that increase complexity
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.If, ast.While, ast.For, ast.AsyncFor)):
+                complexity += 1
+            elif isinstance(node, ast.ExceptHandler):
+                complexity += 1
+            elif isinstance(node, (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)):
+                complexity += 1
+            elif isinstance(node, ast.BoolOp):
+                complexity += len(node.values) - 1
+            
+        return complexity
 
 class AdvancedCodeAnalyzer:
     """Advanced code analyzer with multi-language support"""
@@ -78,6 +153,7 @@ class AdvancedCodeAnalyzer:
         self.language_detectors = self._build_language_detectors()
         self.security_patterns = self._build_security_patterns()
         self.code_smell_patterns = self._build_code_smell_patterns()
+        self.python_analyzer = PythonASTAnalyzer()
 
         if not include_tests:
             self.exclude_dirs.update({'test', 'tests', '__tests__', 'spec', 'specs'})
@@ -151,117 +227,8 @@ class AdvancedCodeAnalyzer:
         return False
 
     def analyze_python_file(self, file_path: str) -> Optional[FileMetrics]:
-        """Analyze Python file using AST"""
-        try:
-            # Check file size first to avoid hanging on massive files
-            file_size = os.path.getsize(file_path)
-            if file_size > FILE_SIZE_LIMIT:
-                # No console output for large files
-                metrics = FileMetrics(file_path=file_path, language='python')
-                metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
-                return metrics
-
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-            except Exception:
-                # Silently handle read errors
-                metrics = FileMetrics(file_path=file_path, language='python')
-                metrics.loc = metrics.sloc = 0
-                return metrics
-
-            # Parse AST with thread-based timeout
-            # Define a function to parse the AST
-            def parse_ast():
-                try:
-                    return ast.parse(content, filename=file_path)
-                except SyntaxError as e:
-                    return e
-                except Exception as e:
-                    return e
-
-            # Use thread-based timeout
-            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
-            tree_result = timeout_runner.run_with_timeout(parse_ast)
-
-            if isinstance(tree_result, TimeoutError):
-                # Create basic metrics without console output
-                metrics = FileMetrics(file_path=file_path, language='python')
-                lines = content.count('\n') + 1
-                metrics.loc = metrics.sloc = lines
-                return metrics
-            elif isinstance(tree_result, SyntaxError):
-                # Create basic metrics for files with syntax errors without console output
-                metrics = FileMetrics(file_path=file_path, language='python')
-                lines = content.count('\n') + 1
-                metrics.loc = metrics.sloc = lines
-                return metrics
-            elif isinstance(tree_result, Exception):
-                # Create basic metrics without console output
-                metrics = FileMetrics(file_path=file_path, language='python')
-                lines = content.count('\n') + 1
-                metrics.loc = metrics.sloc = lines
-                return metrics
-
-            tree = tree_result
-            metrics = FileMetrics(file_path=file_path, language='python')
-
-            # Count AST nodes
-            try:
-                classes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
-                functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
-
-                metrics.classes = len(classes)
-                metrics.functions = len(functions)
-
-                # Methods per class
-                for cls in classes:
-                    methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
-                    metrics.methods_per_class[cls.name] = len(methods)
-                    metrics.methods += len(methods)
-
-                # Imports
-                imports = set()
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.Import):
-                        for alias in node.names:
-                            imports.add(alias.name.split('.')[0])
-                    elif isinstance(node, ast.ImportFrom):
-                        if node.module:
-                            imports.add(node.module.split('.')[0])
-
-                metrics.imports = sorted(imports)
-
-                # Cyclomatic complexity
-                metrics.cyclomatic_complexity = self._calculate_cyclomatic_complexity(tree)
-            except Exception:
-                # Fill with default values without console output
-                lines = content.count('\n') + 1
-                metrics.loc = metrics.sloc = lines
-
-            return metrics
-
-        except Exception:
-            # Return minimal metrics object rather than None, without console output
-            metrics = FileMetrics(file_path=file_path, language='python')
-            metrics.loc = metrics.sloc = 0
-            return metrics
-
-    def _calculate_cyclomatic_complexity(self, tree: ast.AST) -> int:
-        """Calculate cyclomatic complexity for Python AST"""
-        complexity = 1  # Base complexity
-
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.If, ast.While, ast.For, ast.AsyncFor)):
-                complexity += 1
-            elif isinstance(node, ast.ExceptHandler):
-                complexity += 1
-            elif isinstance(node, (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)):
-                complexity += 1
-            elif isinstance(node, ast.BoolOp):
-                complexity += len(node.values) - 1
-
-        return complexity
+        """Analyze Python file using the dedicated PythonASTAnalyzer"""
+        return self.python_analyzer.analyze_file(file_path)
 
     def analyze_generic_file(self, file_path: str, language: str) -> Optional[FileMetrics]:
         """Analyze non-Python files with generic patterns"""

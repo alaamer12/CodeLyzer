@@ -19,6 +19,129 @@ app = typer.Typer(
 )
 
 
+def validate_project_path(path: str) -> Path:
+    """Validate the provided path and return a Path object."""
+    project_path = Path(path).resolve()
+    if not project_path.exists() or not project_path.is_dir():
+        console.print(f"[red]❌ Path '{path}' is not a valid directory[/red]")
+        raise typer.Exit(1)
+    return project_path
+
+
+def display_initial_info(project_path: Path, exclude: List[str], include_tests: bool) -> None:
+    """Display initial information about the analysis."""
+    console.print(Panel.fit(
+        f"🔍 [bold blue]Advanced Codebase Analysis[/bold blue]\n"
+        f"📁 Project: [cyan]{project_path.name}[/cyan]\n"
+        f"📂 Path: [dim]{project_path}[/dim]",
+        border_style="blue"
+    ))
+
+    if exclude:
+        console.print(f"[yellow]📁 Excluding directories:[/yellow] {', '.join(exclude)}")
+
+    if include_tests:
+        console.print("[yellow]🧪 Including test directories[/yellow]")
+
+
+def create_and_display_layout(metrics) -> None:
+    """Create and display the layout with tables."""
+    layout = Layout()
+    layout.split_column(
+        Layout(name="top"),
+        Layout(name="bottom")
+    )
+
+    layout["top"].split_row(
+        Layout(create_language_distribution_table(metrics), name="languages"),
+        Layout(create_complexity_table(metrics), name="complexity")
+    )
+
+    layout["bottom"].split_row(
+        Layout(create_hotspots_table(metrics), name="hotspots"),
+        Layout(create_dependencies_table(metrics), name="dependencies")
+    )
+
+    console.print(layout)
+
+
+def display_verbose_info(metrics) -> None:
+    """Display additional verbose information."""
+    console.rule("[bold blue]📊 Detailed Analysis")
+
+    # File size distribution
+    size_table = Table(title="📏 File Size Distribution", box=box.ROUNDED)
+    size_table.add_column("Size Range", style="cyan")
+    size_table.add_column("Files", justify="right", style="magenta")
+
+    size_ranges = [(0, 100), (100, 500), (500, 1000), (1000, 5000), (5000, float('inf'))]
+    size_labels = ["< 100 lines", "100-500 lines", "500-1K lines", "1K-5K lines", "> 5K lines"]
+
+    for (min_size, max_size), label in zip(size_ranges, size_labels):
+        count = sum(1 for f in metrics.file_metrics
+                    if min_size <= f.sloc < max_size)
+        size_table.add_row(label, str(count))
+
+    console.print(size_table)
+    console.print()
+
+    display_security_issues(metrics)
+
+
+def display_security_issues(metrics) -> None:
+    """Display security issues if any exist."""
+    if any(f.security_issues for f in metrics.file_metrics):
+        security_table = Table(title="🔒 Security Issues", box=box.ROUNDED)
+        security_table.add_column("Issue Type", style="red")
+        security_table.add_column("Files Affected", justify="right", style="magenta")
+
+        security_counts = Counter()
+        for file_metrics in metrics.file_metrics:
+            for issue in file_metrics.security_issues:
+                security_counts[issue] += 1
+
+        for issue, count in security_counts.most_common():
+            security_table.add_row(issue.replace('_', ' ').title(), str(count))
+
+        console.print(security_table)
+        console.print()
+
+
+def generate_reports(metrics, output_format: str, output_dir: str, project_path: Path) -> None:
+    """Generate reports based on the specified format."""
+    if output_format in ["html", "all"]:
+        output_path = Path(output_dir)
+        output_path.mkdir(exist_ok=True)
+
+        html_file = output_path / f"{project_path.name}_analysis.html"
+        generate_html_report(metrics, str(html_file))
+        console.print(f"[green]✅ HTML report saved:[/green] [link]{html_file}[/link]")
+
+    if output_format in ["json", "all"]:
+        output_path = Path(output_dir)
+        output_path.mkdir(exist_ok=True)
+
+        json_file = output_path / f"{project_path.name}_analysis.json"
+        export_json_report(metrics, str(json_file))
+        console.print(f"[green]✅ JSON report saved:[/green] [link]{json_file}[/link]")
+
+
+def display_final_summary(metrics) -> None:
+    """Display the final analysis summary."""
+    console.rule("[bold green]🎉 Analysis Complete")
+
+    quality_emoji = "🟢" if metrics.code_quality_score >= 80 else "🟡" if metrics.code_quality_score >= 60 else "🔴"
+    maintainability_emoji = "🟢" if metrics.maintainability_score >= 80 else "🟡" if metrics.maintainability_score >= 60 else "🔴"
+
+    console.print(f"""
+[bold]📈 Final Assessment:[/bold]
+{quality_emoji} Code Quality: {metrics.code_quality_score:.1f}/100
+{maintainability_emoji} Maintainability: {metrics.maintainability_score:.1f}/100
+⏱️  Analysis completed in {metrics.analysis_duration:.2f} seconds
+🎯 Focus on the {len(metrics.most_complex_files)} most complex files for maximum impact
+""")
+
+
 @app.command()
 def analyze(
         path: str = typer.Argument(".", help="🎯 Path to analyze (default: current directory)"),
@@ -34,24 +157,10 @@ def analyze(
     """
 
     # Validate path
-    project_path = Path(path).resolve()
-    if not project_path.exists() or not project_path.is_dir():
-        console.print(f"[red]❌ Path '{path}' is not a valid directory[/red]")
-        raise typer.Exit(1)
+    project_path = validate_project_path(path)
 
-    # Setup
-    console.print(Panel.fit(
-        f"🔍 [bold blue]Advanced Codebase Analysis[/bold blue]\n"
-        f"📁 Project: [cyan]{project_path.name}[/cyan]\n"
-        f"📂 Path: [dim]{project_path}[/dim]",
-        border_style="blue"
-    ))
-
-    if exclude:
-        console.print(f"[yellow]📁 Excluding directories:[/yellow] {', '.join(exclude)}")
-
-    if include_tests:
-        console.print("[yellow]🧪 Including test directories[/yellow]")
+    # Display initial information
+    display_initial_info(project_path, exclude, include_tests)
 
     # Initialize analyzer
     analyzer = AdvancedCodeAnalyzer(
@@ -73,92 +182,18 @@ def analyze(
     console.print(create_summary_panel(metrics))
     console.print()
 
-    # Create layout for tables
-    layout = Layout()
-    layout.split_column(
-        Layout(name="top"),
-        Layout(name="bottom")
-    )
-
-    layout["top"].split_row(
-        Layout(create_language_distribution_table(metrics), name="languages"),
-        Layout(create_complexity_table(metrics), name="complexity")
-    )
-
-    layout["bottom"].split_row(
-        Layout(create_hotspots_table(metrics), name="hotspots"),
-        Layout(create_dependencies_table(metrics), name="dependencies")
-    )
-
-    console.print(layout)
+    # Create and display layout with tables
+    create_and_display_layout(metrics)
 
     # Additional verbose information
     if verbose:
-        console.rule("[bold blue]📊 Detailed Analysis")
-
-        # File size distribution
-        size_table = Table(title="📏 File Size Distribution", box=box.ROUNDED)
-        size_table.add_column("Size Range", style="cyan")
-        size_table.add_column("Files", justify="right", style="magenta")
-
-        size_ranges = [(0, 100), (100, 500), (500, 1000), (1000, 5000), (5000, float('inf'))]
-        size_labels = ["< 100 lines", "100-500 lines", "500-1K lines", "1K-5K lines", "> 5K lines"]
-
-        for (min_size, max_size), label in zip(size_ranges, size_labels):
-            count = sum(1 for f in metrics.file_metrics
-                        if min_size <= f.sloc < max_size)
-            size_table.add_row(label, str(count))
-
-        console.print(size_table)
-        console.print()
-
-        # Security issues summary
-        if any(f.security_issues for f in metrics.file_metrics):
-            security_table = Table(title="🔒 Security Issues", box=box.ROUNDED)
-            security_table.add_column("Issue Type", style="red")
-            security_table.add_column("Files Affected", justify="right", style="magenta")
-
-            security_counts = Counter()
-            for file_metrics in metrics.file_metrics:
-                for issue in file_metrics.security_issues:
-                    security_counts[issue] += 1
-
-            for issue, count in security_counts.most_common():
-                security_table.add_row(issue.replace('_', ' ').title(), str(count))
-
-            console.print(security_table)
-            console.print()
+        display_verbose_info(metrics)
 
     # Generate reports
-    if output_format in ["html", "all"]:
-        output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True)
-
-        html_file = output_path / f"{project_path.name}_analysis.html"
-        generate_html_report(metrics, str(html_file))
-        console.print(f"[green]✅ HTML report saved:[/green] [link]{html_file}[/link]")
-
-    if output_format in ["json", "all"]:
-        output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True)
-
-        json_file = output_path / f"{project_path.name}_analysis.json"
-        export_json_report(metrics, str(json_file))
-        console.print(f"[green]✅ JSON report saved:[/green] [link]{json_file}[/link]")
+    generate_reports(metrics, output_format, output_dir, project_path)
 
     # Final summary
-    console.rule("[bold green]🎉 Analysis Complete")
-
-    quality_emoji = "🟢" if metrics.code_quality_score >= 80 else "🟡" if metrics.code_quality_score >= 60 else "🔴"
-    maintainability_emoji = "🟢" if metrics.maintainability_score >= 80 else "🟡" if metrics.maintainability_score >= 60 else "🔴"
-
-    console.print(f"""
-[bold]📈 Final Assessment:[/bold]
-{quality_emoji} Code Quality: {metrics.code_quality_score:.1f}/100
-{maintainability_emoji} Maintainability: {metrics.maintainability_score:.1f}/100
-⏱️  Analysis completed in {metrics.analysis_duration:.2f} seconds
-🎯 Focus on the {len(metrics.most_complex_files)} most complex files for maximum impact
-""")
+    display_final_summary(metrics)
 
 
 @app.command()

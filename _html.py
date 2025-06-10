@@ -717,7 +717,15 @@ def generate_html_report(metrics: ProjectMetrics, output_path: str):
     except KeyError as e:
         console.print(f"[red]Error in HTML template formatting: {str(e)}[/red]")
         # Fallback to minimal report
-        html_content = f"""
+        html_content = generate_fallback_report(metrics)
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
+
+def generate_fallback_report(metrics: ProjectMetrics) -> str:
+    """Generate fallback report when HTML generation fails"""
+    return f"""
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -782,6 +790,3 @@ def generate_html_report(metrics: ProjectMetrics, output_path: str):
         </body>
         </html>
         """
-    
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(html_content)
