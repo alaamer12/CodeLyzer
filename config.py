@@ -53,7 +53,7 @@ LANGUAGE_CONFIGS = {
 
 # Default directories to exclude
 DEFAULT_EXCLUDED_DIRS = {
-    '.venv', 'venv', 'env', '__pycache__', '.git', 'node_modules', 
+    '.venv', 'venv', 'env', '__pycache__', '.git', 'node_modules',
     'build', 'dist', '.next', '.nuxt', 'target', 'bin', 'obj',
     'example', 'examples', 'template', 'templates', 'benchmark',
     'coverage', '.coverage', '.pytest_cache', '.mypy_cache',
@@ -66,6 +66,7 @@ DEFAULT_EXCLUDED_FILES = {
     'package-lock.json', 'yarn.lock', 'Cargo.lock'
 }
 
+
 class ComplexityLevel(StrEnum):
     TRIVIAL = 'trivial'
     LOW = 'low'
@@ -74,12 +75,14 @@ class ComplexityLevel(StrEnum):
     VERY_HIGH = 'very_high'
     EXTREME = 'extreme'
 
+
 class SecurityLevel(StrEnum):
     SECURE = 'secure'
     LOW_RISK = 'low_risk'
     MEDIUM_RISK = 'medium_risk'
     HIGH_RISK = 'high_risk'
     CRITICAL = 'critical'
+
 
 @dataclass
 class FileMetrics:
@@ -104,7 +107,8 @@ class FileMetrics:
     code_smells: List[str] = field(default_factory=list)
     file_size: int = 0
     last_modified: float = 0.0
-    
+
+
 @dataclass
 class ProjectMetrics:
     """Aggregated project metrics"""
