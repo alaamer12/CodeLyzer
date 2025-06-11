@@ -75,157 +75,189 @@ class CodeSmellAnalyzer(MetricProvider):
 
     def _check_function_length(self, file_metrics: FileMetrics, file_content: str, language: str) -> None:
         """Check for overly long functions/methods"""
+        if language == "python":
+            self._check_python_function_length(file_metrics, file_content)
+        elif language in ("javascript", "typescript", "jsx"):
+            self._check_js_function_length(file_metrics, file_content)
+
+    def _check_python_function_length(self, file_metrics: FileMetrics, file_content: str) -> None:
+        """Check for overly long Python functions"""
         import re
 
-        # Language-specific function detection
-        if language == "python":
-            # Find Python function definitions
-            func_pattern = r"def\s+(\w+)\s*\("
-            functions = re.finditer(func_pattern, file_content)
+        # Find Python function definitions
+        func_pattern = r"def\s+(\w+)\s*\("
+        functions = re.finditer(func_pattern, file_content)
+
+        for match in functions:
+            func_name = match.group(1)
+            func_start = match.start()
+            line_count = self._count_python_function_lines(file_content[func_start:])
+
+            self._report_function_length_issues(
+                file_metrics,
+                func_name,
+                line_count,
+                self._get_line_number(file_content, func_start)
+            )
+
+    @staticmethod
+    def _count_python_function_lines(function_text: str) -> int:
+        """Count the number of lines in a Python function body"""
+        lines = function_text.split('\n')
+        line_count = 0
+        in_function = False
+
+        for i, line in enumerate(lines):
+            if i == 0:  # Function definition line
+                in_function = True
+                continue
+
+            if in_function:
+                stripped = line.strip()
+                if stripped:  # Non-empty line
+                    # Check if line is still in function (by indentation)
+                    indent = len(line) - len(line.lstrip())
+                    if indent == 0:  # No indentation means out of function
+                        break
+                    line_count += 1
+
+        return line_count
+
+    def _check_js_function_length(self, file_metrics: FileMetrics, file_content: str) -> None:
+        """Check for overly long JavaScript/TypeScript functions"""
+        import re
+
+        # Define patterns for different function declaration styles
+        func_patterns = self._get_js_function_patterns()
+
+        for pattern in func_patterns:
+            functions = re.finditer(pattern, file_content)
 
             for match in functions:
-                # Get function name and position
                 func_name = match.group(1)
                 func_start = match.start()
+                line_count = self._count_js_function_lines(file_content[func_start:])
 
-                # Find function body by indentation
-                lines = file_content[func_start:].split('\n')
-                line_count = 0
-                in_function = False
+                self._report_function_length_issues(
+                    file_metrics,
+                    func_name,
+                    line_count,
+                    self._get_line_number(file_content, func_start)
+                )
 
-                for i, line in enumerate(lines):
-                    if i == 0:  # Function definition line
-                        in_function = True
-                        continue
+    @staticmethod
+    def _get_js_function_patterns() -> list[str]:
+        """Get regex patterns for different JavaScript function styles"""
+        return [
+            r"function\s+(\w+)\s*\([^)]*\)\s*{",  # function name() {}
+            r"(?:const|let|var)\s+(\w+)\s*=\s*function\s*\([^)]*\)\s*{",  # const name = function() {}
+            r"(?:const|let|var)\s+(\w+)\s*=\s*\([^)]*\)\s*=>\s*{",  # const name = () => {}
+            r"(\w+)\s*:\s*function\s*\([^)]*\)\s*{",  # name: function() {}
+        ]
 
-                    if in_function:
-                        stripped = line.strip()
-                        if stripped:  # Non-empty line
-                            # Check if line is still in function (by indentation)
-                            indent = len(line) - len(line.lstrip())
-                            if indent == 0:  # No indentation means out of function
-                                break
-                            line_count += 1
+    @staticmethod
+    def _count_js_function_lines(function_text: str) -> int:
+        """Count the number of lines in a JavaScript function body"""
+        lines = function_text.split('\n')
+        brace_count = 0
+        line_count = 0
 
-                # Check function length
-                if line_count > 50:
-                    location = self._get_line_number(file_content, func_start)
-                    self._add_code_smell(
-                        file_metrics,
-                        "function_too_long",
-                        f"Function '{func_name}' has {line_count} lines (recommended max: 50)",
-                        location,
-                        CodeSmellSeverity.MAJOR
-                    )
-                elif line_count > 30:
-                    location = self._get_line_number(file_content, func_start)
-                    self._add_code_smell(
-                        file_metrics,
-                        "function_long",
-                        f"Function '{func_name}' has {line_count} lines (recommended max: 30)",
-                        location,
-                        CodeSmellSeverity.MINOR
-                    )
+        for i, line in enumerate(lines):
+            if i == 0:  # Function definition line
+                brace_count += line.count('{')
+                continue
 
-        elif language in ("javascript", "typescript", "jsx"):
-            # Find JS function definitions (multiple formats)
-            func_patterns = [
-                r"function\s+(\w+)\s*\([^)]*\)\s*{",  # function name() {}
-                r"(?:const|let|var)\s+(\w+)\s*=\s*function\s*\([^)]*\)\s*{",  # const name = function() {}
-                r"(?:const|let|var)\s+(\w+)\s*=\s*\([^)]*\)\s*=>\s*{",  # const name = () => {}
-                r"(\w+)\s*:\s*function\s*\([^)]*\)\s*{",  # name: function() {}
-            ]
+            brace_count += line.count('{') - line.count('}')
+            line_count += 1
 
-            for pattern in func_patterns:
-                functions = re.finditer(pattern, file_content)
+            if brace_count <= 0:
+                break
 
-                for match in functions:
-                    # Get function name and position
-                    func_name = match.group(1)
-                    func_start = match.start()
+        return line_count
 
-                    # Find function body by counting braces
-                    lines = file_content[func_start:].split('\n')
-                    brace_count = 0
-                    line_count = 0
-
-                    for i, line in enumerate(lines):
-                        if i == 0:  # Function definition line
-                            brace_count += line.count('{')
-                            continue
-
-                        brace_count += line.count('{') - line.count('}')
-                        line_count += 1
-
-                        if brace_count <= 0:
-                            break
-
-                    # Check function length
-                    if line_count > 50:
-                        location = self._get_line_number(file_content, func_start)
-                        self._add_code_smell(
-                            file_metrics,
-                            "function_too_long",
-                            f"Function '{func_name}' has {line_count} lines (recommended max: 50)",
-                            location,
-                            CodeSmellSeverity.MAJOR
-                        )
-                    elif line_count > 30:
-                        location = self._get_line_number(file_content, func_start)
-                        self._add_code_smell(
-                            file_metrics,
-                            "function_long",
-                            f"Function '{func_name}' has {line_count} lines (recommended max: 30)",
-                            location,
-                            CodeSmellSeverity.MINOR
-                        )
+    def _report_function_length_issues(self, file_metrics: FileMetrics, func_name: str,
+                                       line_count: int, location: dict) -> None:
+        """Report code smells for functions that exceed length thresholds"""
+        if line_count > 50:
+            self._add_code_smell(
+                file_metrics,
+                "function_too_long",
+                f"Function '{func_name}' has {line_count} lines (recommended max: 50)",
+                location,
+                CodeSmellSeverity.MAJOR
+            )
+        elif line_count > 30:
+            self._add_code_smell(
+                file_metrics,
+                "function_long",
+                f"Function '{func_name}' has {line_count} lines (recommended max: 30)",
+                location,
+                CodeSmellSeverity.MINOR
+            )
 
     def _check_commented_code(self, file_metrics: FileMetrics, file_content: str, language: str) -> None:
         """Detect commented-out code blocks"""
         lines = file_content.split('\n')
+        marker = self._get_comment_marker(language)
+        code_indicators = self._get_code_indicators()
+
+        comment_block = []
+        for i, line in enumerate(lines):
+            comment_block = self._process_line(line, marker, code_indicators, comment_block, i, file_metrics)
+
+        # Check remaining block at end of file
+        self._report_comment_block_if_needed(comment_block, file_metrics)
+
+    @staticmethod
+    def _get_comment_marker(language: str) -> str:
+        """Get the comment marker for the specified language"""
         comment_markers = {
             "python": "#",
             "javascript": "//",
             "typescript": "//",
             "jsx": "//"
         }
+        return comment_markers.get(language, "#")
 
-        marker = comment_markers.get(language, "#")
-        code_indicators = [
-            "if ", "for ", "while ", "def ", "class ", "function", "return ", "var ", "let ", "const "
+    @staticmethod
+    def _get_code_indicators() -> list[str]:
+        """Get list of strings that indicate code in comments"""
+        return [
+            "if ", "for ", "while ", "def ", "class ", "function",
+            "return ", "var ", "let ", "const "
         ]
 
-        # Track consecutive commented lines
-        comment_block = []
-        for i, line in enumerate(lines):
-            stripped = line.strip()
+    def _process_line(self, line: str, marker: str, code_indicators: list[str],
+                      comment_block: list, line_index: int, file_metrics: FileMetrics) -> list:
+        """Process a single line and update the comment block accordingly"""
+        stripped = line.strip()
 
-            # Check for comment line
-            if stripped.startswith(marker):
-                comment_content = stripped[len(marker):].strip()
+        if stripped.startswith(marker):
+            return self._handle_comment_line(stripped, marker, code_indicators, comment_block, line_index)
+        else:
+            # Not a comment, check if we had a comment block
+            self._report_comment_block_if_needed(comment_block, file_metrics)
+            return []
 
-                # Check if comment looks like code
-                if any(indicator in comment_content for indicator in code_indicators):
-                    comment_block.append((i + 1, comment_content))
-                else:
-                    # Not code-like, reset block if only one line
-                    if len(comment_block) <= 1:
-                        comment_block = []
-            else:
-                # Not a comment, check if we had a comment block
-                if len(comment_block) >= 3:  # 3+ lines of commented code
-                    start_line = comment_block[0][0]
-                    self._add_code_smell(
-                        file_metrics,
-                        "commented_code",
-                        f"Found block of {len(comment_block)} lines of commented-out code",
-                        {'line': start_line, 'column': 1},
-                        CodeSmellSeverity.MINOR
-                    )
-                comment_block = []
+    @staticmethod
+    def _handle_comment_line(stripped_line: str, marker: str,
+                             code_indicators: list[str], comment_block: list, line_index: int) -> list:
+        """Handle a line that is a comment"""
+        comment_content = stripped_line[len(marker):].strip()
 
-        # Check remaining block at end of file
-        if len(comment_block) >= 3:
+        # Check if comment looks like code
+        if any(indicator in comment_content for indicator in code_indicators):
+            comment_block.append((line_index + 1, comment_content))
+            return comment_block
+        else:
+            # Not code-like, reset block if only one line
+            if len(comment_block) <= 1:
+                return []
+            return comment_block
+
+    def _report_comment_block_if_needed(self, comment_block: list, file_metrics: FileMetrics) -> None:
+        """Report a code smell if the comment block is large enough"""
+        if len(comment_block) >= 3:  # 3+ lines of commented code
             start_line = comment_block[0][0]
             self._add_code_smell(
                 file_metrics,

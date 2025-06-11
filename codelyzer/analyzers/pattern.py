@@ -51,7 +51,7 @@ class PatternBasedAnalyzer(MetricProvider):
 
         # Convert sets to lists for JSON serialization
         for pattern_name in pattern_stats:
-            pattern_stats[pattern_name]['files'] = list(pattern_stats[pattern_name]['files'])
+            pattern_stats[pattern_name]['files'] = set(pattern_stats[pattern_name]['files'])
 
         # Add to project metrics
         project_metrics.add_custom_metric('design_patterns', pattern_stats)
