@@ -8,526 +8,262 @@ Supports multiple programming languages with detailed metrics and visualizations
 import os
 import json
 import time
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
-import re
-import math
+from typing import Dict, List, Optional, Set
 
-from ast_analyzers import PythonASTAnalyzer
-from config import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_FILES, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, \
-    ComplexityLevel, FILE_SIZE_LIMIT, TIMEOUT_SECONDS
+from ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
+from config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, TIMEOUT_SECONDS
 from utils import FunctionWithTimeout, TimeoutError
 from console import console, create_analysis_progress_bar
+from helpers import StandardFileDiscovery, SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
+    PatternBasedAnalyzer, ProjectMetricsProcessor
 
+
+def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
+    """Initialize analyzers for different languages (strategy pattern)"""
+    analyzers = {}
+
+    # Add Python analyzer
+    python_analyzer = PythonASTAnalyzer()
+    analyzers['python'] = python_analyzer
+
+    # Add JavaScript analyzer
+    try:
+        js_analyzer = JavaScriptASTAnalyzer()
+        analyzers['javascript'] = js_analyzer
+        analyzers['typescript'] = js_analyzer  # Same analyzer handles both
+        analyzers['jsx'] = js_analyzer
+    except Exception as e:
+        console.print(f"[yellow]Warning: JavaScript analyzer not available: {str(e)}[/yellow]")
+
+    # Add other analyzers as needed
+    # analyzers['java'] = JavaASTAnalyzer()
+
+    return analyzers
+
+
+def get_file_size(file_path: str) -> int:
+    """Get the size of a file safely"""
+    try:
+        return os.path.getsize(file_path)
+    except OSError:
+        return 0
+
+
+def read_content(file_path: str) -> Optional[str]:
+    """Read file content safely"""
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            return f.read()
+    except Exception:
+        return None
 
 
 class AdvancedCodeAnalyzer:
-    """Advanced code analyzer with multi-language support"""
+    """Advanced code analyzer with multi-language support and modular architecture"""
 
     def __init__(self, exclude_dirs: Set[str] = None, include_tests: bool = False):
+        # Prepare exclude dirs
         self.exclude_dirs = (exclude_dirs or set()) | DEFAULT_EXCLUDED_DIRS
-        self.include_tests = include_tests
-        self.language_detectors = self._build_language_detectors()
-        self.security_patterns = self._build_security_patterns()
-        self.code_smell_patterns = self._build_code_smell_patterns()
-        self.python_analyzer = PythonASTAnalyzer()
-
         if not include_tests:
             self.exclude_dirs.update({'test', 'tests', '__tests__', 'spec', 'specs'})
 
-    def _build_language_detectors(self) -> Dict[str, List[str]]:
-        """Build file extension to language mapping"""
-        detectors = {}
-        for lang, config in LANGUAGE_CONFIGS.items():
-            for ext in config['extensions']:
-                if ext not in detectors:
-                    detectors[ext] = []
-                detectors[ext].append(lang)
-        return detectors
+        # Initialize components (dependency injection)
+        self.file_discovery = StandardFileDiscovery(self.exclude_dirs, LANGUAGE_CONFIGS)
+        self.security_analyzer = SecurityAnalyzer()
+        self.code_smell_analyzer = CodeSmellAnalyzer()
+        self.complexity_analyzer = ComplexityAnalyzer(LANGUAGE_CONFIGS)
+        self.pattern_analyzer = PatternBasedAnalyzer(LANGUAGE_CONFIGS)
+        self.metrics_processor = ProjectMetricsProcessor()
 
-    def _build_security_patterns(self) -> Dict[str, List[str]]:
-        """Build security vulnerability patterns"""
-        return {
-            'sql_injection': [
-                r'(?i)execute\s*\(\s*["\'].*%.*["\']',
-                r'(?i)query\s*\(\s*["\'].*\+.*["\']',
-                r'(?i)cursor\.execute\s*\([^,)]*%',
-            ],
-            'xss': [
-                r'(?i)innerHTML\s*=\s*.*\+',
-                r'(?i)document\.write\s*\(',
-                r'(?i)eval\s*\(',
-            ],
-            'hardcoded_secrets': [
-                r'(?i)(password|pwd|secret|key)\s*=\s*["\'][^"\']{8,}["\']',
-                r'(?i)(api_key|apikey|access_key)\s*=\s*["\'][^"\']{20,}["\']',
-                r'(?i)(token|auth)\s*=\s*["\'][^"\']{30,}["\']',
-            ],
-            'unsafe_deserialization': [
-                r'(?i)pickle\.load',
-                r'(?i)yaml\.load\(',
-                r'(?i)json\.loads.*input',
-            ]
-        }
-
-    @staticmethod
-    def _build_code_smell_patterns() -> dict[str, str]:
-        """Build code smell patterns"""
-        return {
-            'long_methods': r'def\s+\w+.*:\s*\n(?:\s+.*\n){50,}',
-            'duplicate_code': r'(.{50,})\n(?:.*\n)*?\1',
-            'magic_numbers': r'\b(?<![\w.])\d{3,}\b(?![\w.])',
-            'god_class': r'class\s+\w+.*:\s*\n(?:\s+.*\n){200,}',
-            'feature_envy': r'(\w+)\.(\w+)\.(\w+)\.(\w+)',
-        }
-
-    def detect_language(self, file_path: str) -> Optional[str]:
-        """Detect programming language from file extension"""
-        ext = Path(file_path).suffix.lower()
-        languages = self.language_detectors.get(ext, [])
-        return languages[0] if languages else None
-
-    def should_exclude_file(self, file_path: str) -> bool:
-        """Check if file should be excluded from analysis"""
-        path = Path(file_path)
-
-        # Check if any part of the path contains excluded directories
-        for part in path.parts:
-            if part in self.exclude_dirs:
-                return True
-
-        # Check excluded file patterns
-        for pattern in DEFAULT_EXCLUDED_FILES:
-            if path.match(pattern):
-                return True
-
-        return False
-
-    def analyze_python_file(self, file_path: str) -> Optional[FileMetrics]:
-        """Analyze Python file using the dedicated PythonASTAnalyzer"""
-        return self.python_analyzer.analyze_file(file_path)
-
-    def analyze_generic_file(self, file_path: str, language: str) -> Optional[FileMetrics]:
-        """Analyze non-Python files with generic patterns"""
-        try:
-            # Check file size first to avoid hanging on massive files
-            file_size = os.path.getsize(file_path)
-            if file_size > FILE_SIZE_LIMIT:
-                # No console output for large files
-                metrics = FileMetrics(file_path=file_path, language=language)
-                metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
-                return metrics
-
-            metrics = FileMetrics(file_path=file_path, language=language)
-
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-            except Exception:
-                # Create basic metrics without console output
-                metrics.loc = metrics.sloc = 0
-                return metrics
-
-            config = LANGUAGE_CONFIGS.get(language, LANGUAGE_CONFIGS['python'])
-
-            # Pattern matching with thread-based timeout
-            def pattern_matching():
-                try:
-                    patterns_found = 0
-                    for keyword in config['keywords']:
-                        pattern = rf'\b{keyword}\b'
-                        matches = re.findall(pattern, content, re.IGNORECASE)
-                        patterns_found += len(matches)
-
-                        if keyword in ['def', 'function', 'func', 'fn']:
-                            metrics.functions += len(matches)
-                        elif keyword in ['class', 'struct', 'interface']:
-                            metrics.classes += len(matches)
-                    return patterns_found
-                except Exception:
-                    return 0
-
-            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
-            result = timeout_runner.run_with_timeout(pattern_matching)
-
-            if isinstance(result, TimeoutError) or isinstance(result, Exception):
-                # Count lines as fallback without console output
-                try:
-                    lines = content.count('\n') + 1
-                    metrics.loc = metrics.sloc = lines
-                except Exception:
-                    metrics.loc = metrics.sloc = 0
-                return metrics
-
-            # Count lines manually
-            try:
-                lines = content.count('\n') + 1
-                metrics.loc = metrics.sloc = lines
-            except Exception:
-                metrics.loc = metrics.sloc = 0
-
-            # If no errors, return metrics
-            return metrics
-
-        except Exception:
-            # Return minimal metrics object without console output
-            metrics = FileMetrics(file_path=file_path, language=language)
-            metrics.loc = metrics.sloc = 0
-            return metrics
-
-    def count_lines(self, file_path: str, language: str) -> Tuple[int, int, int, int]:
-        """Count different types of lines in a file"""
-        try:
-            # Check file size first to avoid hanging on massive files
-            try:
-                file_size = os.path.getsize(file_path)
-            except OSError:
-                return 0, 0, 0, 0
-
-            if file_size > FILE_SIZE_LIMIT:
-                # Provide rough estimates for large files without console output
-                total_lines = file_size // 50  # Approx 50 bytes per line as rough estimate
-                source_lines = int(total_lines * 0.7)  # Estimate 70% of lines are source code
-                comment_lines = int(total_lines * 0.2)  # Estimate 20% are comments
-                blank_lines = total_lines - source_lines - comment_lines  # Remaining are blank
-                return total_lines, source_lines, comment_lines, blank_lines
-
-            # For normal-sized files, count lines with thread-based timeout
-            total_lines = 0
-            blank_lines = 0
-            comment_lines = 0
-
-            config = LANGUAGE_CONFIGS.get(language, LANGUAGE_CONFIGS['python'])
-            comment_patterns = [re.compile(pattern) for pattern in config['comment_patterns']]
-
-            def count_file_lines():
-                nonlocal total_lines, blank_lines, comment_lines
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        for line in f:
-                            total_lines += 1
-                            stripped = line.strip()
-                            if not stripped:
-                                blank_lines += 1
-                            elif any(pattern.match(stripped) for pattern in comment_patterns):
-                                comment_lines += 1
-                    return True
-                except Exception:
-                    return False
-
-            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
-            result = timeout_runner.run_with_timeout(count_file_lines)
-
-            if result is False or isinstance(result, Exception) or isinstance(result, TimeoutError):
-                # Provide rough estimates without console output
-                total_lines = file_size // 50
-                source_lines = int(total_lines * 0.7)
-                comment_lines = int(total_lines * 0.2)
-                blank_lines = total_lines - source_lines - comment_lines
-                return total_lines, source_lines, comment_lines, blank_lines
-
-            # Calculate source lines
-            source_lines = total_lines - blank_lines - comment_lines
-
-            return total_lines, source_lines, comment_lines, blank_lines
-
-        except Exception:
-            # Return zeros without console output
-            return 0, 0, 0, 0
-
-    def detect_security_issues(self, content: str) -> List[str]:
-        """Detect potential security issues"""
-        issues = []
-        for category, patterns in self.security_patterns.items():
-            for pattern in patterns:
-                if re.search(pattern, content, re.MULTILINE | re.IGNORECASE):
-                    issues.append(category)
-                    break
-        return issues
-
-    def detect_code_smells(self, content: str) -> List[str]:
-        """Detect code smells"""
-        smells = []
-        for smell, pattern in self.code_smell_patterns.items():
-            if re.search(pattern, content, re.MULTILINE):
-                smells.append(smell)
-        return smells
+        # Initialize language-specific analyzers
+        self.language_analyzers = initialize_analyzers()
 
     def analyze_file(self, file_path: str) -> Optional[FileMetrics]:
-        """Analyze a single file"""
+        """Analyze a single file using the appropriate analyzer"""
         try:
-            if self.should_exclude_file(file_path):
+            if not self._should_analyze_file(file_path):
                 return None
 
-            language = self.detect_language(file_path)
-            if not language:
-                return None
+            language = self.file_discovery.detect_language(file_path)
+            file_size = get_file_size(file_path)
 
-            # Get file stats
-            try:
-                stat = os.stat(file_path)
-                file_size = stat.st_size
-                last_modified = stat.st_mtime
-            except OSError:
-                file_size = 0
-                last_modified = 0.0
+            metrics, content = self._get_file_metrics_and_content(file_path, language, file_size)
 
-            # Create basic metrics object
-            metrics = FileMetrics(file_path=file_path, language=language)
-            metrics.file_size = file_size
-            metrics.last_modified = last_modified
-
-            # Check file size first to avoid hanging on massive files
-            if file_size > FILE_SIZE_LIMIT:
-                console.print(
-                    f"[yellow]Warning: Large file {file_path} ({file_size / 1024 / 1024:.1f} MB), using basic metrics[/yellow]")
-                metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
-                return metrics
-
-            # Analyze based on language
-            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
-
-            if language == 'python':
-                result = timeout_runner.run_with_timeout(self.analyze_python_file, file_path)
-            else:
-                result = timeout_runner.run_with_timeout(self.analyze_generic_file, file_path, language)
-
-            if isinstance(result, TimeoutError):
-                console.print(f"[yellow]Warning: Analysis timed out for {file_path}, using basic metrics[/yellow]")
-                # Fill in count_lines data at minimum
-                try:
-                    total, source, comments, blanks = self.count_lines(file_path, language)
-                    metrics.loc = total
-                    metrics.sloc = source
-                    metrics.comments = comments
-                    metrics.blanks = blanks
-                except Exception as e:
-                    console.print(f"[yellow]Warning: Failed to count lines in {file_path}: {str(e)}[/yellow]")
-                return metrics
-            elif isinstance(result, Exception):
-                console.print(f"[yellow]Warning: Error analyzing {file_path}: {str(result)}[/yellow]")
-                return metrics
-
-            # If analysis succeeded, use the detailed metrics
-            if result:
-                metrics = result
-
-            # Count lines if not already set
-            if metrics.loc == 0:
-                try:
-                    total, source, comments, blanks = self.count_lines(file_path, language)
-                    metrics.loc = total
-                    metrics.sloc = source
-                    metrics.comments = comments
-                    metrics.blanks = blanks
-                except Exception as e:
-                    console.print(f"[yellow]Warning: Failed to count lines in {file_path}: {str(e)}[/yellow]")
-
-            # Security and quality analysis (with timeouts)
-            try:
-                def security_analysis():
-                    try:
-                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            content = f.read()
-                        return (self.detect_security_issues(content),
-                                self.detect_code_smells(content))
-                    except Exception as e:
-                        console.print(f"[yellow]Warning: Error in security analysis for {file_path}: {str(e)}[/yellow]")
-                        return [], []
-
-                timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS // 2)  # Use shorter timeout
-                security_result = timeout_runner.run_with_timeout(security_analysis)
-
-                if isinstance(security_result, Exception) or isinstance(security_result, TimeoutError):
-                    console.print(f"[yellow]Warning: Security analysis timed out for {file_path}[/yellow]")
-                else:
-                    security_issues, code_smells = security_result
-                    metrics.security_issues = security_issues
-                    metrics.code_smells = code_smells
-            except Exception:
-                pass
-
-            # Calculate complexity metrics
-            try:
-                config = LANGUAGE_CONFIGS.get(language, LANGUAGE_CONFIGS['python'])
-                weights = config['complexity_weights']
-
-                metrics.complexity_score = (
-                        metrics.sloc * weights['loc'] +
-                        metrics.classes * weights['classes'] +
-                        metrics.functions * weights['functions'] +
-                        metrics.methods * weights['methods']
-                )
-
-                # Maintainability index (simplified)
-                if metrics.sloc > 0:
-                    metrics.maintainability_index = max(0.0, 171 - 5.2 * math.log(metrics.sloc) -
-                                                        0.23 * (metrics.cyclomatic_complexity or 1) -
-                                                        16.2 * math.log(max(1, len(metrics.imports or []))))
-            except Exception as e:
-                console.print(
-                    f"[yellow]Warning: Error calculating complexity metrics for {file_path}: {str(e)}[/yellow]")
+            if metrics and content:
+                self._apply_additional_analysis(file_path, content, metrics)
 
             return metrics
 
         except Exception as e:
-            console.print(f"[red]Error analyzing {file_path}: {str(e)}[/red]")
-            # Return minimal metrics object rather than None
-            metrics = FileMetrics(file_path=file_path, language=language if 'language' in locals() else 'unknown')
-            metrics.loc = metrics.sloc = 0
-            return metrics
+            return self._create_fallback_metrics(file_path, e)
+
+    def _should_analyze_file(self, file_path: str) -> bool:
+        """Check if the file should be analyzed"""
+        if not self.file_discovery.should_include_file(file_path):
+            return False
+
+        language = self.file_discovery.detect_language(file_path)
+        return language is not None
+
+    def _get_file_metrics_and_content(self, file_path: str, language: str, file_size: int) -> tuple[
+                                        Optional[FileMetrics], Optional[str]]:
+        """Get metrics and content for a file using appropriate analyzer"""
+        analyzer = self.language_analyzers.get(language)
+        content = None
+
+        if analyzer:
+            metrics = analyzer.analyze_file(file_path)
+            if metrics:
+                metrics.file_size = file_size
+                content = read_content(file_path)
+        else:
+            # Fall back to pattern-based analysis
+            result = self.pattern_analyzer.analyze_file(file_path, language)
+            if isinstance(result, tuple):
+                metrics, content = result
+            else:
+                metrics = result
+                content = None
+
+            if metrics:
+                metrics.file_size = file_size
+
+        return metrics, content
+
+    def _apply_additional_analysis(self, file_path: str, content: str, metrics: FileMetrics) -> None:
+        """Apply additional analyzers to the file content"""
+        self.security_analyzer.analyze(file_path, content, metrics)
+        self.code_smell_analyzer.analyze(file_path, content, metrics)
+        self.complexity_analyzer.analyze(file_path, content, metrics)
+
+    def _create_fallback_metrics(self, file_path: str, error: Exception) -> FileMetrics:
+        """Create minimal metrics when analysis fails"""
+        console.print(f"[yellow]Warning: Error analyzing {file_path}: {str(error)}[/yellow]")
+        language = self.file_discovery.detect_language(file_path) or "unknown"
+        metrics = FileMetrics(file_path=file_path, language=language)
+        metrics.loc = metrics.sloc = 0
+        return metrics
 
     def analyze_project(self, project_path: str) -> ProjectMetrics:
         """Analyze entire project"""
         start_time = time.time()
         project_metrics = ProjectMetrics()
 
-        # Get all files
-        console.print("[bold blue]🔍 Finding files to analyze...[/bold blue]")
-        all_files = []
-        for root, dirs, files in os.walk(project_path):
-            # Filter directories
-            dirs[:] = [d for d in dirs if d not in self.exclude_dirs]
+        # Discover files
+        all_files = self._discover_project_files(project_path)
 
-            for file in files:
-                file_path = os.path.join(root, file)
-                if self.detect_language(file_path) and not self.should_exclude_file(file_path):
-                    all_files.append(file_path)
-
-        console.print(f"[bold green]🔍 Found {len(all_files)} files to analyze[/bold green]")
-
-        # Set up a progress display
-        total_files = len(all_files)
-        if total_files == 0:
+        # Handle empty file list
+        if not all_files:
             console.print("[yellow]No files to analyze[/yellow]")
             return project_metrics
 
-        with create_analysis_progress_bar() as progress:
-            task = progress.add_task("[cyan]Analyzing files...", total=total_files)
+        # Process files with progress bar
+        self._process_files_with_progress(all_files, project_metrics, start_time)
 
-            # Process files
-            stats_interval = max(100, total_files // 10)  # Show stats every ~10% or 100 files
+        # Process final metrics
+        self._finalize_project_metrics(project_metrics)
+        project_metrics.analysis_duration = time.time() - start_time
+
+        return project_metrics
+
+    def _discover_project_files(self, project_path: str) -> List[str]:
+        """Discover files to analyze in the project"""
+        console.print("[bold blue]🔍 Finding files to analyze...[/bold blue]")
+        all_files = self.file_discovery.discover_files(project_path)
+        console.print(f"[bold green]🔍 Found {len(all_files)} files to analyze[/bold green]")
+        return all_files
+
+    def _process_files_with_progress(self, all_files: List[str], project_metrics: ProjectMetrics,
+                                     start_time: float) -> None:
+        """Process all files with progress tracking"""
+        with create_analysis_progress_bar() as progress:
+            task = progress.add_task("[cyan]Analyzing files...", total=len(all_files))
+
+            # Track language stats for periodic updates
             stats_counter = 0
+            stats_interval = max(100, len(all_files) // 10)
             language_stats = {}
 
             for i, file_path in enumerate(all_files):
                 # Update progress
                 progress.update(task, advance=1, description=f"[cyan]Analyzing {os.path.basename(file_path)}")
 
-                try:
-                    # Process this file with a timeout and additional safeguards
-                    def analyze_single_file():
-                        try:
-                            return self.analyze_file(file_path)
-                        except Exception as e:
-                            console.print(f"[red]❌ Exception in analyze_file: {str(e)}[/red]")
-                            return None
+                # Analyze file with timeout protection
+                metrics = self._analyze_file_with_timeout(file_path)
 
-                    timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
-                    result = timeout_runner.run_with_timeout(analyze_single_file)
+                if metrics:
+                    self._update_project_metrics(project_metrics, metrics, language_stats)
 
-                    if isinstance(result, TimeoutError):
-                        # Quietly log timeouts rather than printing to console
-                        continue
-                    elif isinstance(result, Exception):
-                        # Quietly log errors rather than printing to console
-                        continue
+                    # Show periodic stats
+                    stats_counter += 1
+                    if stats_counter >= stats_interval:
+                        self._show_progress_stats(i, len(all_files), start_time, language_stats)
+                        stats_counter = 0
 
-                    metrics = result
-                    if metrics:
-                        project_metrics.file_metrics.append(metrics)
+    def _analyze_file_with_timeout(self, file_path: str) -> Optional[FileMetrics]:
+        """Analyze a file with timeout protection"""
 
-                        # Update aggregated stats - add safeguards for None values
-                        project_metrics.total_files += 1
-                        project_metrics.total_loc += metrics.loc or 0
-                        project_metrics.total_sloc += metrics.sloc or 0
-                        project_metrics.total_comments += metrics.comments or 0
-                        project_metrics.total_blanks += metrics.blanks or 0
-                        project_metrics.total_classes += metrics.classes or 0
-                        project_metrics.total_functions += metrics.functions or 0
-                        project_metrics.total_methods += metrics.methods or 0
-                        project_metrics.project_size += metrics.file_size or 0
+        def analyze_with_timeout():
+            return self.analyze_file(file_path)
 
-                        # Language distribution
-                        if metrics.language:
-                            project_metrics.languages[metrics.language] = project_metrics.languages.get(
-                                metrics.language, 0) + 1
-                            language_stats[metrics.language] = language_stats.get(metrics.language, 0) + 1
+        timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
+        result = timeout_runner.run_with_timeout(analyze_with_timeout)
 
-                        # Dependencies
-                        if metrics.imports:
-                            for imp in metrics.imports:
-                                project_metrics.dependencies[imp] = project_metrics.dependencies.get(imp, 0) + 1
+        if isinstance(result, (TimeoutError, Exception)):
+            return None
+        return result
 
-                        # Print occasional stats rather than per-file messages
-                        stats_counter += 1
-                        if stats_counter >= stats_interval:
-                            # Show summary stats periodically
-                            elapsed = time.time() - start_time
-                            files_per_sec = i / elapsed if elapsed > 0 else 0
-                            console.print(
-                                f"\n[bold green]📊 Progress: {i + 1}/{total_files} files processed ({files_per_sec:.1f} files/sec)[/bold green]")
-
-                            # Show top languages
-                            if language_stats:
-                                top_langs = sorted(language_stats.items(), key=lambda x: x[1], reverse=True)[:3]
-                                lang_summary = ", ".join(f"{lang}: {count}" for lang, count in top_langs)
-                                console.print(f"[green]Top languages: {lang_summary}[/green]")
-
-                            stats_counter = 0
-
-                except Exception as e:
-                    # Continue with next file after error (without printing)
-                    continue
-
+    def _finalize_project_metrics(self, project_metrics: ProjectMetrics) -> None:
+        """Process and finalize project metrics"""
         console.print(
             f"\n[bold green]✅ Processing complete. {project_metrics.total_files} files successfully analyzed.[/bold green]")
+        self.metrics_processor.process_metrics(project_metrics)
 
-        # Post-processing
-        self._calculate_derived_metrics(project_metrics)
-        project_metrics.analysis_duration = time.time() - start_time
+    def _update_project_metrics(self, project_metrics: ProjectMetrics, metrics: FileMetrics,
+                                language_stats: Dict) -> None:
+        """Update project metrics with file metrics"""
+        project_metrics.file_metrics.append(metrics)
 
+        # Update aggregate metrics
+        project_metrics = self._update_aggregate_metrics(project_metrics, metrics)
+
+        # Language stats
+        if metrics.language:
+            project_metrics.languages[metrics.language] = project_metrics.languages.get(metrics.language, 0) + 1
+            language_stats[metrics.language] = language_stats.get(metrics.language, 0) + 1
+
+        # Dependencies
+        if metrics.imports:
+            for imp in metrics.imports:
+                project_metrics.dependencies[imp] = project_metrics.dependencies.get(imp, 0) + 1
+
+    @staticmethod
+    def _update_aggregate_metrics(project_metrics: ProjectMetrics, metrics: FileMetrics) -> ProjectMetrics:
+        """Update aggregate metrics"""
+        project_metrics.total_files += 1
+        project_metrics.total_loc += metrics.loc or 0
+        project_metrics.total_sloc += metrics.sloc or 0
+        project_metrics.total_comments += metrics.comments or 0
+        project_metrics.total_blanks += metrics.blanks or 0
+        project_metrics.total_classes += metrics.classes or 0
+        project_metrics.total_functions += metrics.functions or 0
+        project_metrics.total_methods += metrics.methods or 0
+        project_metrics.project_size += metrics.file_size or 0
         return project_metrics
 
-    def _calculate_derived_metrics(self, metrics: ProjectMetrics):
-        """Calculate derived metrics and rankings"""
-        if not metrics.file_metrics:
-            return
+    @staticmethod
+    def _show_progress_stats(current: int, total: int, start_time: float, language_stats: Dict) -> None:
+        """Show progress statistics"""
+        elapsed = time.time() - start_time
+        files_per_sec = current / elapsed if elapsed > 0 else 0
+        console.print(
+            f"\n[bold green]📊 Progress: {current + 1}/{total} files processed ({files_per_sec:.1f} files/sec)[/bold green]")
 
-        # Sort by complexity
-        metrics.file_metrics.sort(key=lambda x: x.complexity_score, reverse=True)
-        metrics.most_complex_files = metrics.file_metrics[:10]
-
-        # Sort by size
-        metrics.largest_files = sorted(metrics.file_metrics,
-                                       key=lambda x: x.sloc, reverse=True)[:10]
-
-        # Complexity distribution
-        for file_metrics in metrics.file_metrics:
-            if file_metrics.complexity_score < 50:
-                level = ComplexityLevel.TRIVIAL
-            elif file_metrics.complexity_score < 200:
-                level = ComplexityLevel.LOW
-            elif file_metrics.complexity_score < 500:
-                level = ComplexityLevel.MODERATE
-            elif file_metrics.complexity_score < 1000:
-                level = ComplexityLevel.HIGH
-            elif file_metrics.complexity_score < 2000:
-                level = ComplexityLevel.VERY_HIGH
-            else:
-                level = ComplexityLevel.EXTREME
-
-            metrics.complexity_distribution[level] = metrics.complexity_distribution.get(level, 0) + 1
-
-        # Quality scores
-        if metrics.total_sloc > 0:
-            metrics.code_quality_score = min(100, max(0,
-                                                      int(100 - (sum(len(f.security_issues) + len(f.code_smells)
-                                                                 for f in
-                                                                 metrics.file_metrics) / metrics.total_files * 10))))
-
-            avg_maintainability = sum(f.maintainability_index for f in metrics.file_metrics) / len(metrics.file_metrics)
-            metrics.maintainability_score = max(0, min(100, int(avg_maintainability)))
+        # Show top languages
+        if language_stats:
+            top_langs = sorted(language_stats.items(), key=lambda x: x[1], reverse=True)[:3]
+            lang_summary = ", ".join(f"{lang}: {count}" for lang, count in top_langs)
+            console.print(f"[green]Top languages: {lang_summary}[/green]")
 
 
 def export_json_report(metrics: ProjectMetrics, output_path: str):
