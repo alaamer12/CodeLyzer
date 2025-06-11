@@ -16,7 +16,7 @@ import pandas as pd
 from codelyzer.analyzers import SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
     PatternBasedAnalyzer
 from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer, \
-    TypeScriptASTAnalyzer, RustASTAnalyzer
+    TypeScriptASTAnalyzer, RustStubASTAnalyzer
 from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, TIMEOUT_SECONDS
 from codelyzer.console import console, create_analysis_progress_bar
 from codelyzer.helpers import StandardFileDiscovery, ProjectMetricsProcessor, Scoring
@@ -54,7 +54,7 @@ def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
             'aliases': ['tsx']
         },
         'rust': {
-            'class': RustASTAnalyzer,
+            'class': RustStubASTAnalyzer,
             'aliases': []
         }
     }
