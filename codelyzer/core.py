@@ -18,7 +18,7 @@ from codelyzer.analyzers import SecurityAnalyzer, CodeSmellAnalyzer, ComplexityA
 from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer, \
     TypeScriptASTAnalyzer, RustStubASTAnalyzer
 from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, TIMEOUT_SECONDS
-from codelyzer.console import console, create_analysis_progress_bar
+from codelyzer.console import console, create_analysis_progress_bar, create_finding_files_progress_bar
 from codelyzer.helpers import StandardFileDiscovery, ProjectMetricsProcessor, Scoring
 from codelyzer.metrics import FileMetrics, ProjectMetrics, create_file_metrics
 from codelyzer.utils import FunctionWithTimeout
@@ -208,8 +208,11 @@ class AdvancedCodeAnalyzer:
 
     def _discover_project_files(self, project_path: str) -> List[str]:
         """Discover files to analyze in the project"""
-        console.print("[bold blue]🔍 Finding files to analyze...[/bold blue]")
-        all_files = self.file_discovery.discover_files(project_path)
+        finding_files_progress = create_finding_files_progress_bar()
+        with finding_files_progress as progress:
+            task = progress.add_task("[cyan]Finding files...", total=100)
+            all_files = self.file_discovery.discover_files(project_path)
+            progress.update(task, completed=len(all_files), total=len(all_files))
         console.print(f"[bold green]🔍 Found {len(all_files)} files to analyze[/bold green]")
         return all_files
 

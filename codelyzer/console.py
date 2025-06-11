@@ -268,6 +268,14 @@ def create_dependencies_table(metrics: ProjectMetrics) -> Table:
 
     return table
 
+def create_finding_files_progress_bar() -> Progress:
+    """Create undetermind progress bar for finding files."""
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]Finding files...", justify="right"),
+        console=console
+    )
+
 
 def create_analysis_progress_bar() -> Progress:
     """Create a standardized progress bar for analysis operations."""
