@@ -6,19 +6,6 @@ from typing import List, Tuple, Dict, Any
 
 from codelyzer.config import ProjectMetrics, ComplexityLevel
 
-
-"""Enhanced HTML Report Generator with improved styling and linting fixes."""
-
-import json
-import os
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Tuple, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from your_project import ProjectMetrics, ComplexityLevel
-
-
 class PlotReportGenerator:
     """Generate plotting components for codebase analysis reports using Plotly."""
     
@@ -44,7 +31,6 @@ class PlotReportGenerator:
         }
         
         # Complexity distribution data
-        from your_project import ComplexityLevel  # Import here to avoid circular imports
         complexity_labels = [
             level.replace('_', ' ').title() for level in ComplexityLevel
         ]
@@ -66,18 +52,22 @@ class PlotReportGenerator:
             HTML string for the charts grid
         """
         return '''
-        <div class="charts-grid fade-in">
-            <div class="chart-container">
-                <h3><i class="fas fa-globe" aria-hidden="true"></i> Language Distribution</h3>
-                <div class="chart-wrapper">
-                    <div id="languageChart" style="width: 100%; height: 100%;"></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 opacity-0 transition-opacity duration-500" id="charts-grid">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center">
+                    <i class="fas fa-globe text-blue-500 mr-2" aria-hidden="true"></i> Language Distribution
+                </h3>
+                <div class="h-64 relative">
+                    <div id="languageChart" class="w-full h-full"></div>
                 </div>
             </div>
             
-            <div class="chart-container">
-                <h3><i class="fas fa-layer-group" aria-hidden="true"></i> Complexity Distribution</h3>
-                <div class="chart-wrapper">
-                    <div id="complexityChart" style="width: 100%; height: 100%;"></div>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center">
+                    <i class="fas fa-layer-group text-green-500 mr-2" aria-hidden="true"></i> Complexity Distribution
+                </h3>
+                <div class="h-64 relative">
+                    <div id="complexityChart" class="w-full h-full"></div>
                 </div>
             </div>
         </div>'''
@@ -116,7 +106,7 @@ class PlotReportGenerator:
                     textposition: 'outside',
                     textfont: {{
                         size: 12,
-                        color: '#374151'
+                        color: 'var(--text-primary)'
                     }}
                 }}], 
                 {{
@@ -130,7 +120,7 @@ class PlotReportGenerator:
                         x: 0.5,
                         font: {{
                             size: 11,
-                            color: '#6b7280'
+                            color: 'var(--text-secondary)'
                         }}
                     }},
                     paper_bgcolor: 'transparent',
@@ -175,13 +165,13 @@ class PlotReportGenerator:
                             text: 'Complexity Level',
                             font: {{
                                 size: 12,
-                                color: '#6b7280'
+                                color: 'var(--text-secondary)'
                             }}
                         }},
                         tickangle: -45,
                         tickfont: {{
                             size: 10,
-                            color: '#6b7280'
+                            color: 'var(--text-secondary)'
                         }},
                         gridcolor: 'rgba(0,0,0,0.1)'
                     }},
@@ -190,12 +180,12 @@ class PlotReportGenerator:
                             text: 'Number of Files',
                             font: {{
                                 size: 12,
-                                color: '#6b7280'
+                                color: 'var(--text-secondary)'
                             }}
                         }},
                         tickfont: {{
                             size: 10,
-                            color: '#6b7280'
+                            color: 'var(--text-secondary)'
                         }},
                         gridcolor: 'rgba(0,0,0,0.1)'
                     }},
@@ -204,7 +194,16 @@ class PlotReportGenerator:
                 }}, 
                 {{responsive: true, displayModeBar: false}}
             );
-        }}'''
+        }}
+        
+        // Show charts with fade-in effect
+        setTimeout(() => {{
+            const chartsGrid = document.getElementById('charts-grid');
+            if (chartsGrid) {{
+                chartsGrid.classList.remove('opacity-0');
+                chartsGrid.classList.add('opacity-100');
+            }}
+        }}, 300);'''
 
 
 class HTMLReportGenerator:
@@ -266,16 +265,16 @@ class HTMLReportGenerator:
             issues_display = self._get_issues_display(issues)
             
             rows += f'''
-        <tr>
-            <td>
-                <div class="file-path" title="{relative_path}">
+        <tr class="hover:bg-gray-50 hover:scale-[1.005] transition-all duration-200">
+            <td class="px-6 py-4 border-b border-gray-200">
+                <div class="flex items-center gap-2 font-mono text-sm text-gray-600 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap bg-gray-50 px-2 py-1 rounded border border-gray-200" title="{relative_path}">
                     <i class="fas fa-file-code" aria-hidden="true"></i>
                     {relative_path}
                 </div>
             </td>
-            <td><span class="stat-number">{file_metrics.sloc:,}</span></td>
-            <td><span class="badge {complexity_badge}">{file_metrics.complexity_score:.0f}</span></td>
-            <td>{issues_display}</td>
+            <td class="px-6 py-4 border-b border-gray-200"><span class="font-semibold text-gray-900 tabular-nums">{file_metrics.sloc:,}</span></td>
+            <td class="px-6 py-4 border-b border-gray-200"><span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide {complexity_badge}">{file_metrics.complexity_score:.0f}</span></td>
+            <td class="px-6 py-4 border-b border-gray-200">{issues_display}</td>
         </tr>'''
         
         return rows
@@ -307,10 +306,10 @@ class HTMLReportGenerator:
             CSS class name for the badge
         """
         if complexity_score > 500:
-            return "danger"
+            return "bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300"
         elif complexity_score > 200:
-            return "warning"
-        return "success"
+            return "bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300"
+        return "bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300"
     
     def _get_issues_display(self, issues_count: int) -> str:
         """Get the HTML display for issues count.
@@ -322,10 +321,10 @@ class HTMLReportGenerator:
             HTML string for displaying issue count
         """
         if issues_count == 0:
-            return '<span class="badge success"><i class="fas fa-check" aria-hidden="true"></i> Clean</span>'
+            return '<span class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300 hover:scale-105 transition-transform"><i class="fas fa-check" aria-hidden="true"></i> Clean</span>'
         elif issues_count < 3:
-            return f'<span class="badge warning"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> {issues_count} Issues</span>'
-        return f'<span class="badge danger"><i class="fas fa-times-circle" aria-hidden="true"></i> {issues_count} Issues</span>'
+            return f'<span class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300 hover:scale-105 transition-transform"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> {issues_count} Issues</span>'
+        return f'<span class="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300 hover:scale-105 transition-transform"><i class="fas fa-times-circle" aria-hidden="true"></i> {issues_count} Issues</span>'
     
     def _generate_dependencies_rows(self, metrics: 'ProjectMetrics') -> str:
         """Generate HTML rows for the dependencies table.
@@ -343,20 +342,22 @@ class HTMLReportGenerator:
         for module, count in top_deps:
             usage_percent = (count / max_usage) * 100
             rows += f'''
-        <tr>
-            <td>
-                <code class="module-name">
+        <tr class="hover:bg-gray-50 hover:scale-[1.005] transition-all duration-200">
+            <td class="px-6 py-4 border-b border-gray-200">
+                <code class="flex items-center gap-2 bg-gray-50 px-2 py-1 rounded border border-gray-200 text-sm">
                     <i class="fas fa-cube" aria-hidden="true"></i>
                     {module}
                 </code>
             </td>
-            <td><span class="stat-number">{count:,}</span></td>
-            <td>
-                <div class="usage-display">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: {usage_percent}%"></div>
+            <td class="px-6 py-4 border-b border-gray-200"><span class="font-semibold text-gray-900 tabular-nums">{count:,}</span></td>
+            <td class="px-6 py-4 border-b border-gray-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-full h-2.5 bg-gray-200 rounded-full shadow-inner overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full transition-all duration-700 ease-out relative" style="width: {usage_percent}%">
+                            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+                        </div>
                     </div>
-                    <span class="usage-percent">{usage_percent:.0f}%</span>
+                    <span class="text-xs text-gray-600 font-medium min-w-[40px] tabular-nums">{usage_percent:.0f}%</span>
                 </div>
             </td>
         </tr>'''
@@ -399,12 +400,79 @@ class HTMLReportGenerator:
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {{
+            theme: {{
+                extend: {{
+                    fontFamily: {{
+                        'inter': ['Inter', 'system-ui', 'sans-serif'],
+                    }},
+                    animation: {{
+                        'float': 'float 6s ease-in-out infinite',
+                        'shimmer': 'shimmer 2s infinite',
+                        'fade-in': 'fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+                    }},
+                    keyframes: {{
+                        float: {{
+                            '0%, 100%': {{ transform: 'translateY(0px) rotate(0deg)' }},
+                            '50%': {{ transform: 'translateY(-20px) rotate(2deg)' }},
+                        }},
+                        shimmer: {{
+                            '0%': {{ transform: 'translateX(-100%)' }},
+                            '100%': {{ transform: 'translateX(200%)' }},
+                        }},
+                        fadeIn: {{
+                            'from': {{ opacity: '0', transform: 'translateY(30px) scale(0.95)' }},
+                            'to': {{ opacity: '1', transform: 'translateY(0) scale(1)' }},
+                        }},
+                    }},
+                }}
+            }}
+        }}
+    </script>
     <style>
-        {self._get_css_styles()}
+        .chart-wrapper {{
+            height: 400px;
+        }}
+        @media (max-width: 768px) {{
+            .chart-wrapper {{
+                height: 300px;
+            }}
+        }}
+        @media (max-width: 480px) {{
+            .chart-wrapper {{
+                height: 250px;
+            }}
+        }}
+        .progress-shimmer::after {{
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%);
+            animation: shimmer 2s infinite;
+        }}
+        /* Accessibility and print styles */
+        @media (prefers-reduced-motion: reduce) {{
+            *, *::before, *::after {{
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }}
+        }}
+        @media print {{
+            body {{
+                background: white !important;
+                font-size: 12px;
+            }}
+        }}
     </style>
 </head>
-<body>
-    <div class="container">
+<body class="font-inter bg-gradient-to-br from-gray-50 via-white to-gray-50 text-gray-800 text-sm min-h-screen">
+    <div class="max-w-7xl mx-auto p-6">
         {self._get_header_html()}
         {self._get_metrics_grid_html(metrics)}
         {self._plot_generator.get_charts_grid_html()}
@@ -415,660 +483,6 @@ class HTMLReportGenerator:
 </body>
 </html>'''
     
-    def _get_css_styles(self) -> str:
-        """Get the enhanced CSS styles for the HTML template.
-        
-        Returns:
-            CSS styles as a string
-        """
-        return '''
-        :root {
-            --primary-color: #2563eb;
-            --primary-dark: #1d4ed8;
-            --secondary-color: #1e40af;
-            --accent-color: #3b82f6;
-            --success-color: #10b981;
-            --success-light: #34d399;
-            --warning-color: #f59e0b;
-            --warning-light: #fbbf24;
-            --danger-color: #ef4444;
-            --danger-light: #f87171;
-            --gray-50: #f9fafb;
-            --gray-100: #f3f4f6;
-            --gray-200: #e5e7eb;
-            --gray-300: #d1d5db;
-            --gray-400: #9ca3af;
-            --gray-500: #6b7280;
-            --gray-600: #4b5563;
-            --gray-700: #374151;
-            --gray-800: #1f2937;
-            --gray-900: #111827;
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-            --transition-all: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-colors: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-        }
-
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-        }
-
-        body { 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6; 
-            color: var(--gray-800); 
-            background: linear-gradient(135deg, var(--gray-50) 0%, #ffffff 50%, var(--gray-50) 100%);
-            font-size: 14px;
-            min-height: 100vh;
-            scroll-behavior: smooth;
-        }
-
-        .container { 
-            max-width: 1400px; 
-            margin: 0 auto; 
-            padding: 24px;
-        }
-
-        .metrics-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-            gap: 24px; 
-            margin-bottom: 40px; 
-        }
-
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 32px;
-            margin-bottom: 40px;
-        }
-
-        .tables-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 32px;
-            margin-bottom: 40px;
-        }
-
-        .header { 
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            color: white; 
-            padding: 48px 0; 
-            text-align: center; 
-            margin-bottom: 32px; 
-            border-radius: 20px;
-            box-shadow: var(--shadow-2xl);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
-            opacity: 0.3;
-        }
-
-        .header::after {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .header-content { 
-            position: relative; 
-            z-index: 1; 
-        }
-
-        .header h1 { 
-            font-size: 2.5rem; 
-            font-weight: 700; 
-            margin-bottom: 12px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-        }
-
-        .header p { 
-            font-size: 1.1rem; 
-            opacity: 0.9; 
-            font-weight: 300;
-        }
-
-        .metric-card { 
-            background: white; 
-            padding: 28px; 
-            border-radius: 16px; 
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--gray-200);
-            transition: var(--transition-all);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .metric-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
-            transition: var(--transition-all);
-        }
-
-        .metric-card:hover { 
-            transform: translateY(-8px) scale(1.02); 
-            box-shadow: var(--shadow-xl);
-        }
-
-        .metric-card:hover::before {
-            height: 6px;
-        }
-
-        .metric-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-
-        .metric-icon {
-            width: 52px;
-            height: 52px;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            color: white;
-            transition: var(--transition-all);
-            box-shadow: var(--shadow-md);
-        }
-
-        .metric-card:hover .metric-icon {
-            transform: scale(1.1) rotate(5deg);
-        }
-
-        .metric-icon.files { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); }
-        .metric-icon.code { background: linear-gradient(135deg, var(--success-color), var(--success-light)); }
-        .metric-icon.classes { background: linear-gradient(135deg, var(--warning-color), var(--warning-light)); }
-        .metric-icon.functions { background: linear-gradient(135deg, var(--danger-color), var(--danger-light)); }
-        .metric-icon.quality { background: linear-gradient(135deg, var(--accent-color), #60a5fa); }
-        .metric-icon.maintainability { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
-
-        .metric-value { 
-            font-size: 2.75rem; 
-            font-weight: 700; 
-            color: var(--gray-900);
-            line-height: 1;
-            margin-bottom: 8px;
-            background: linear-gradient(135deg, var(--gray-900), var(--gray-700));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .metric-label { 
-            color: var(--gray-600); 
-            font-weight: 500;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
-        }
-
-        .chart-container { 
-            background: white; 
-            padding: 32px; 
-            border-radius: 16px; 
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--gray-200);
-            position: relative;
-            transition: var(--transition-all);
-        }
-
-        .chart-container:hover {
-            box-shadow: var(--shadow-lg);
-            transform: translateY(-2px);
-        }
-
-        .chart-container h3 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 24px;
-            color: var(--gray-900);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .chart-wrapper {
-            position: relative;
-            height: 400px;
-            width: 100%;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .table-container { 
-            background: white; 
-            border-radius: 16px; 
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--gray-200);
-            overflow: hidden;
-            transition: var(--transition-all);
-        }
-
-        .table-container:hover {
-            box-shadow: var(--shadow-lg);
-        }
-
-        .table-header {
-            background: linear-gradient(135deg, var(--gray-50), var(--gray-100));
-            padding: 24px 32px;
-            border-bottom: 1px solid var(--gray-200);
-        }
-
-        .table-header h3 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--gray-900);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .table-wrapper {
-            overflow-x: auto;
-        }
-
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-        }
-
-        th, td { 
-            padding: 16px 24px; 
-            text-align: left; 
-            border-bottom: 1px solid var(--gray-200);
-        }
-
-        th { 
-            background-color: var(--gray-50); 
-            font-weight: 600;
-            color: var(--gray-700);
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        tbody tr { 
-            transition: var(--transition-colors);
-        }
-
-        tbody tr:hover { 
-            background-color: var(--gray-50);
-            transform: scale(1.005);
-        }
-
-        tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        .progress-bar { 
-            width: 100%; 
-            height: 10px; 
-            background-color: var(--gray-200); 
-            border-radius: 6px; 
-            overflow: hidden;
-            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
-        }
-
-        .progress-fill { 
-            height: 100%; 
-            background: linear-gradient(90deg, var(--success-color), var(--warning-color), var(--danger-color)); 
-            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 6px;
-            position: relative;
-        }
-
-        .progress-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%);
-            animation: shimmer 2s infinite;
-        }
-
-        .usage-display {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .usage-percent {
-            font-size: 0.75rem;
-            color: var(--gray-600);
-            min-width: 40px;
-            font-weight: 500;
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.025em;
-            transition: var(--transition-all);
-        }
-
-        .badge:hover {
-            transform: scale(1.05);
-        }
-
-        .badge.success {
-            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-            color: #166534;
-            border: 1px solid #86efac;
-        }
-
-        .badge.warning {
-            background: linear-gradient(135deg, #fef3c7, #fde68a);
-            color: #92400e;
-            border: 1px solid #fcd34d;
-        }
-
-        .badge.danger {
-            background: linear-gradient(135deg, #fee2e2, #fecaca);
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-        }
-
-        .file-path {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.8rem;
-            color: var(--gray-600);
-            max-width: 300px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 8px;
-            background: var(--gray-50);
-            border-radius: 6px;
-            border: 1px solid var(--gray-200);
-        }
-
-        .module-name {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 8px;
-            background: var(--gray-50);
-            border-radius: 6px;
-            border: 1px solid var(--gray-200);
-            font-size: 0.85rem;
-        }
-
-        .stat-number {
-            font-weight: 600;
-            color: var(--gray-900);
-            font-variant-numeric: tabular-nums;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 32px 0;
-            color: var(--gray-500);
-            font-size: 0.875rem;
-            border-top: 1px solid var(--gray-200);
-            margin-top: 40px;
-            background: linear-gradient(135deg, var(--gray-50), transparent);
-            border-radius: 12px;
-        }
-
-        .footer p {
-            margin-bottom: 8px;
-        }
-
-        .footer a {
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: 500;
-            transition: var(--transition-colors);
-        }
-
-        .footer a:hover {
-            color: var(--primary-dark);
-            text-decoration: underline;
-        }
-
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .fade-in {
-            animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        /* Animations */
-        @keyframes fadeIn {
-            from { 
-                opacity: 0; 
-                transform: translateY(30px) scale(0.95); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0) scale(1); 
-            }
-        }
-
-        @keyframes float {
-            0%, 100% { 
-                transform: translateY(0px) rotate(0deg); 
-            }
-            50% { 
-                transform: translateY(-20px) rotate(2deg); 
-            }
-        }
-
-        @keyframes shimmer {
-            0% { 
-                transform: translateX(-100%); 
-            }
-            100% { 
-                transform: translateX(200%); 
-            }
-        }
-
-        @keyframes pulse {
-            0%, 100% { 
-                opacity: 1; 
-            }
-            50% { 
-                opacity: .5; 
-            }
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .container {
-                max-width: 100%;
-                padding: 20px;
-            }
-        }
-
-        @media (max-width: 1024px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-                gap: 24px;
-            }
-            
-            .metric-value {
-                font-size: 2.25rem;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 16px;
-            }
-            
-            .metrics-grid {
-                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-                gap: 16px;
-            }
-            
-            .metric-card {
-                padding: 20px;
-            }
-            
-            .metric-value {
-                font-size: 2rem;
-            }
-            
-            .header {
-                padding: 32px 20px;
-                margin-bottom: 24px;
-            }
-            
-            .header h1 {
-                font-size: 2rem;
-                flex-direction: column;
-                gap: 8px;
-            }
-            
-            .chart-container, .table-container {
-                padding: 20px;
-            }
-            
-            .chart-wrapper {
-                height: 300px;
-            }
-            
-            th, td {
-                padding: 12px 16px;
-                font-size: 0.8rem;
-            }
-            
-            .file-path, .module-name {
-                max-width: 200px;
-                font-size: 0.75rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .header h1 {
-                font-size: 1.75rem;
-            }
-            
-            .metric-value {
-                font-size: 1.75rem;
-            }
-            
-            .chart-wrapper {
-                height: 250px;
-            }
-            
-            .table-wrapper {
-                font-size: 0.75rem;
-            }
-        }
-
-        /* Print Styles */
-        @media print {
-            body {
-                background: white;
-                font-size: 12px;
-            }
-            
-            .container {
-                max-width: none;
-                padding: 0;
-            }
-            
-            .header {
-                background: var(--gray-100) !important;
-                color: var(--gray-900) !important;
-                box-shadow: none;
-            }
-            
-            .metric-card, .chart-container, .table-container {
-                box-shadow: none;
-                border: 1px solid var(--gray-300);
-                break-inside: avoid;
-            }
-            
-            .charts-grid {
-                break-inside: avoid;
-            }
-        }
-
-        /* Accessibility Improvements */
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
-        }
-
-        /* Focus styles for keyboard navigation */
-        .metric-card:focus-within,
-        .chart-container:focus-within,
-        .table-container:focus-within {
-            outline: 2px solid var(--primary-color);
-            outline-offset: 2px;
-        }
-
-        /* High contrast mode support */
-        @media (prefers-contrast: high) {
-            :root {
-                --gray-100: #e0e0e0;
-                --gray-200: #c0c0c0;
-                --gray-600: #404040;
-                --gray-800: #202020;
-            }
-        }
-        '''
-    
     def _get_header_html(self) -> str:
         """Get the header HTML section.
         
@@ -1076,13 +490,17 @@ class HTMLReportGenerator:
             HTML string for the header
         """
         return f'''
-        <div class="header">
-            <div class="header-content">
-                <h1>
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-12 text-center mb-8 rounded-3xl shadow-2xl relative overflow-hidden">
+            <div class="absolute inset-0 opacity-30">
+                <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 100 100\\"><defs><pattern id=\\"grid\\" width=\\"10\\" height=\\"10\\" patternUnits=\\"userSpaceOnUse\\"><path d=\\"M 10 0 L 0 0 0 10\\" fill=\\"none\\" stroke=\\"rgba(255,255,255,0.1)\\" stroke-width=\\"0.5\\"/></pattern></defs><rect width=\\"100\\" height=\\"100\\" fill=\\"url(%23grid)\\"/></svg>');"></div>
+            </div>
+            <div class="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-gradient-radial from-white/10 to-transparent animate-float"></div>
+            <div class="relative z-10">
+                <h1 class="text-4xl lg:text-5xl font-bold mb-3 drop-shadow-sm flex items-center justify-center gap-4 flex-col sm:flex-row">
                     <i class="fas fa-chart-line" aria-hidden="true"></i> 
                     Codebase Analysis Report
                 </h1>
-                <p>Generated on {self._timestamp}</p>
+                <p class="text-lg opacity-90 font-light">Generated on {self._timestamp}</p>
             </div>
         </div>'''
     
@@ -1096,60 +514,66 @@ class HTMLReportGenerator:
             HTML string for the metrics grid
         """
         return f'''
-        <div class="metrics-grid fade-in">
-            <div class="metric-card" tabindex="0">
-                <div class="metric-header">
-                    <div class="metric-icon files">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10 fade-in">
+            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-300 group-hover:h-1.5"></div>
+                <div class="flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-file-code" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="metric-value">{metrics.total_files:,}</div>
-                <div class="metric-label">Files Analyzed</div>
+                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.total_files:,}</div>
+                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Files Analyzed</div>
             </div>
-            <div class="metric-card" tabindex="0">
-                <div class="metric-header">
-                    <div class="metric-icon code">
+            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300 group-hover:h-1.5"></div>
+                <div class="flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-code" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="metric-value">{metrics.total_loc:,}</div>
-                <div class="metric-label">Lines of Code</div>
+                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.total_loc:,}</div>
+                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Lines of Code</div>
             </div>
-            <div class="metric-card" tabindex="0">
-                <div class="metric-header">
-                    <div class="metric-icon classes">
+            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-500 to-yellow-400 transition-all duration-300 group-hover:h-1.5"></div>
+                <div class="flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-cube" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="metric-value">{metrics.total_classes:,}</div>
-                <div class="metric-label">Classes</div>
+                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.total_classes:,}</div>
+                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Classes</div>
             </div>
-            <div class="metric-card" tabindex="0">
-                <div class="metric-header">
-                    <div class="metric-icon functions">
+            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-red-400 transition-all duration-300 group-hover:h-1.5"></div>
+                <div class="flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-cogs" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="metric-value">{metrics.total_functions:,}</div>
-                <div class="metric-label">Functions</div>
+                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.total_functions:,}</div>
+                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Functions</div>
             </div>
-            <div class="metric-card" tabindex="0">
-                <div class="metric-header">
-                    <div class="metric-icon quality">
+            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-300 group-hover:h-1.5"></div>
+                <div class="flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-star" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="metric-value">{metrics.code_quality_score:.1f}%</div>
-                <div class="metric-label">Code Quality</div>
+                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.code_quality_score:.1f}%</div>
+                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Code Quality</div>
             </div>
-            <div class="metric-card" tabindex="0">
-                <div class="metric-header">
-                    <div class="metric-icon maintainability">
+            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-300 group-hover:h-1.5"></div>
+                <div class="flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-tools" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="metric-value">{metrics.maintainability_score:.1f}%</div>
-                <div class="metric-label">Maintainability</div>
+                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.maintainability_score:.1f}%</div>
+                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Maintainability</div>
             </div>
         </div>'''
     
@@ -1160,22 +584,22 @@ class HTMLReportGenerator:
             HTML string for the tables grid
         """
         return f'''
-        <div class="tables-grid fade-in">
-            <div class="table-container">
-                <div class="table-header">
-                    <h3>
+        <div class="space-y-8 fade-in">
+            <div class="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-lg">
+                <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-8 py-6 border-b border-gray-200">
+                    <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-3">
                         <i class="fas fa-fire" aria-hidden="true"></i> 
                         Most Complex Files
                     </h3>
                 </div>
-                <div class="table-wrapper">
-                    <table role="table">
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse" role="table">
                         <thead>
-                            <tr role="row">
-                                <th scope="col">File</th>
-                                <th scope="col">Lines</th>
-                                <th scope="col">Complexity</th>
-                                <th scope="col">Issues</th>
+                            <tr role="row" class="bg-gray-50">
+                                <th scope="col" class="px-6 py-4 text-left font-semibold text-gray-700 text-sm uppercase tracking-wide sticky top-0 z-10 bg-gray-50">File</th>
+                                <th scope="col" class="px-6 py-4 text-left font-semibold text-gray-700 text-sm uppercase tracking-wide sticky top-0 z-10 bg-gray-50">Lines</th>
+                                <th scope="col" class="px-6 py-4 text-left font-semibold text-gray-700 text-sm uppercase tracking-wide sticky top-0 z-10 bg-gray-50">Complexity</th>
+                                <th scope="col" class="px-6 py-4 text-left font-semibold text-gray-700 text-sm uppercase tracking-wide sticky top-0 z-10 bg-gray-50">Issues</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1185,20 +609,20 @@ class HTMLReportGenerator:
                 </div>
             </div>
             
-            <div class="table-container">
-                <div class="table-header">
-                    <h3>
+            <div class="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-lg">
+                <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-8 py-6 border-b border-gray-200">
+                    <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-3">
                         <i class="fas fa-box" aria-hidden="true"></i> 
                         Top Dependencies
                     </h3>
                 </div>
-                <div class="table-wrapper">
-                    <table role="table">
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse" role="table">
                         <thead>
-                            <tr role="row">
-                                <th scope="col">Module</th>
-                                <th scope="col">Usage Count</th>
-                                <th scope="col">Usage Distribution</th>
+                            <tr role="row" class="bg-gray-50">
+                                <th scope="col" class="px-6 py-4 text-left font-semibold text-gray-700 text-sm uppercase tracking-wide sticky top-0 z-10 bg-gray-50">Module</th>
+                                <th scope="col" class="px-6 py-4 text-left font-semibold text-gray-700 text-sm uppercase tracking-wide sticky top-0 z-10 bg-gray-50">Usage Count</th>
+                                <th scope="col" class="px-6 py-4 text-left font-semibold text-gray-700 text-sm uppercase tracking-wide sticky top-0 z-10 bg-gray-50">Usage Distribution</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1216,9 +640,9 @@ class HTMLReportGenerator:
             HTML string for the footer
         """
         return '''
-        <div class="footer fade-in">
-            <p>Report generated by Codebase Analysis Tool</p>
-            <p>
+        <div class="text-center py-8 text-gray-500 text-sm border-t border-gray-200 mt-10 bg-gradient-to-r from-gray-50 to-transparent rounded-xl fade-in">
+            <p class="mb-2">Report generated by Codebase Analysis Tool</p>
+            <p class="flex items-center justify-center gap-2">
                 <i class="fas fa-clock" aria-hidden="true"></i> 
                 For best results, run analysis regularly to track code quality trends
             </p>
