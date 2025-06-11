@@ -15,7 +15,8 @@ import pandas as pd
 
 from codelyzer.analyzers import SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
     PatternBasedAnalyzer
-from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
+from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer, \
+    TypeScriptASTAnalyzer, RustASTAnalyzer
 from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, TIMEOUT_SECONDS
 from codelyzer.console import console, create_analysis_progress_bar
 from codelyzer.helpers import StandardFileDiscovery, ProjectMetricsProcessor, Scoring
@@ -35,27 +36,44 @@ def register_metric_providers() -> None:
 
 def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
     """Initialize analyzers for different languages (strategy pattern)"""
-    analyzers = {}
-
     # Register metric providers (once for all analyzers)
     register_metric_providers()
-
-    # Add Python analyzer
-    python_analyzer = PythonASTAnalyzer()
-    analyzers['python'] = python_analyzer
-
-    # Add JavaScript analyzer
-    try:
-        js_analyzer = JavaScriptASTAnalyzer()
-        analyzers['javascript'] = js_analyzer
-        analyzers['typescript'] = js_analyzer  # Same analyzer handles both
-        analyzers['jsx'] = js_analyzer
-    except Exception as e:
-        console.print(f"[yellow]Warning: JavaScript analyzer not available: {str(e)}[/yellow]")
-
-    # Add other analyzers as needed
-    # analyzers['java'] = JavaASTAnalyzer()
-
+    
+    # Define analyzers configuration
+    analyzer_config = {
+        'python': {
+            'class': PythonASTAnalyzer,
+            'aliases': []
+        },
+        'javascript': {
+            'class': JavaScriptASTAnalyzer,
+            'aliases': ['jsx']
+        },
+        'typescript': {
+            'class': TypeScriptASTAnalyzer,
+            'aliases': ['tsx']
+        },
+        'rust': {
+            'class': RustASTAnalyzer,
+            'aliases': []
+        }
+    }
+    
+    analyzers = {}
+    
+    # Initialize each analyzer with error handling
+    for language, config in analyzer_config.items():
+        try:
+            analyzer = config['class']()
+            analyzers[language] = analyzer
+            
+            # Add any language aliases
+            for alias in config['aliases']:
+                analyzers[alias] = analyzer
+                
+        except Exception as e:
+            console.print(f"[yellow]Warning: {language.capitalize()} analyzer not available: {str(e)}[/yellow]")
+    
     return analyzers
 
 
