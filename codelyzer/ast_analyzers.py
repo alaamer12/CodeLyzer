@@ -1,9 +1,19 @@
 import os
 from abc import ABC, abstractmethod
-from typing import Optional, Type, ClassVar, Dict, List, Any
+from typing import Dict, List, Type, Optional, ClassVar, Any
+import concurrent.futures
 
-from codelyzer.config import BaseFileMetrics, FileMetrics, FILE_SIZE_LIMIT, MetricProvider
+try:
+    import tree_sitter
+    from tree_sitter import Language, Parser
+except ImportError:
+    print("Warning: tree-sitter not installed. Run: pip install tree-sitter")
+
+from codelyzer.config import FILE_SIZE_LIMIT, PARSE_TIMEOUT, GRAMMAR_PATH
+from codelyzer.core import MetricProvider
 from codelyzer.console import console
+from codelyzer.metrics import FileMetrics, BaseFileMetrics
+
 
 
 class ASTAnalyzer(ABC):
@@ -184,26 +194,289 @@ class ASTAnalyzer(ABC):
         pass
 
 
-class PythonASTAnalyzer(ASTAnalyzer):
-    """Analyzer for Python files using the Abstract Syntax Tree"""
+class TreeSitterASTAnalyzer(ASTAnalyzer):
+    """Base class for analyzers that use tree-sitter"""
+    
+    # Will be set by subclasses
+    language_parser: Optional[Parser] = None
+    language_name: str = ""
+    grammar_file: str = ""
+    
+    # Comment node types specific to the language
+    comment_types: List[str] = []
+    
+    @classmethod
+    def initialize_parser(cls):
+        """Initialize the tree-sitter parser for this language"""
+        if cls.language_parser is not None:
+            return  # Already initialized
+            
+        try:
+            grammar_path = os.path.join(GRAMMAR_PATH, cls.grammar_file)
+            if not os.path.exists(grammar_path):
+                console.print(f"[red]Error: Grammar file not found: {grammar_path}[/red]")
+                return
+                
+            language = Language(grammar_path, cls.language_name)
+            parser = Parser()
+            parser.set_language(language)
+            cls.language_parser = parser
+        except Exception as e:
+            console.print(f"[red]Error initializing {cls.language_name} parser: {str(e)}[/red]")
+            cls.language_parser = None
+    
+    def _parse_with_timeout(self, content: str, file_path: str) -> Any:
+        """Parse the file content into an AST with timeout handling"""
+        if self.language_parser is None:
+            self.__class__.initialize_parser()
+            if self.language_parser is None:
+                return Exception(f"Parser for {self.language_name} could not be initialized")
+        
+        # Define a function to do the parsing
+        def parse_content():
+            try:
+                tree = self.language_parser.parse(bytes(content, 'utf8'))
+                return tree
+            except Exception as e:
+                return e
+        
+        # Execute with timeout
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(parse_content)
+            try:
+                return future.result(timeout=PARSE_TIMEOUT)
+            except (concurrent.futures.TimeoutError, Exception) as e:
+                console.print(f"[yellow]Warning: Parsing {file_path} timed out or failed[/yellow]")
+                return e
+    
+    def _count_comment_lines(self, content: str) -> int:
+        """Count comment lines using tree-sitter"""
+        try:
+            if self.language_parser is None:
+                self.__class__.initialize_parser()
+                if self.language_parser is None:
+                    return 0
+                    
+            tree = self.language_parser.parse(bytes(content, 'utf8'))
+            root_node = tree.root_node
+            
+            comment_lines = set()
+            
+            def process_node(node):
+                if node.type in self.comment_types:
+                    start_line = node.start_point[0]
+                    end_line = node.end_point[0]
+                    for line in range(start_line, end_line + 1):
+                        comment_lines.add(line)
+                
+                for child in node.children:
+                    process_node(child)
+            
+            process_node(root_node)
+            return len(comment_lines)
+            
+        except Exception as e:
+            console.print(f"[yellow]Warning: Error counting comment lines: {str(e)}[/yellow]")
+            return 0
+
+
+class PythonASTAnalyzer(TreeSitterASTAnalyzer):
+    """Analyzer for Python files using tree-sitter"""
 
     extensions = ['.py']
+    language_name = "python"
+    grammar_file = "py-lang.so"
+    comment_types = ["comment", "string"]  # Python docstrings are string nodes
+
+    def __init__(self):
+        """Initialize the Python analyzer"""
+        super().__init__()
+        self.__class__.initialize_parser()
 
     @classmethod
     def _get_language_name(cls) -> str:
         return "python"
 
-    
+    def _calculate_metrics(self, ast_data: Any, metrics: FileMetrics, content: str = None) -> None:
+        """Calculate Python-specific metrics from the tree-sitter AST"""
+        if ast_data is None or isinstance(ast_data, Exception):
+            return
+        
+        root_node = ast_data.root_node
+        
+        # Initialize counters
+        class_count = 0
+        function_count = 0
+        method_count = 0
+        import_count = 0
+        
+        # Process the AST
+        def process_node(node):
+            nonlocal class_count, function_count, method_count, import_count
+            
+            if node.type == "class_definition":
+                class_count += 1
+            elif node.type == "function_definition":
+                # Check if this is a method (child of a class)
+                is_method = False
+                parent = node.parent
+                while parent:
+                    if parent.type == "class_definition":
+                        is_method = True
+                        break
+                    parent = parent.parent
+                
+                if is_method:
+                    method_count += 1
+                else:
+                    function_count += 1
+            elif node.type in ["import_statement", "import_from_statement"]:
+                import_count += 1
+            
+            # Process children
+            for child in node.children:
+                process_node(child)
+        
+        # Start processing from root
+        process_node(root_node)
+        
+        # Update metrics
+        metrics.base.classes = class_count
+        metrics.base.functions = function_count + method_count
+        metrics.base.imports = import_count
+        
+        # Calculate cyclomatic complexity - count branches
+        complexity = self._calculate_cyclomatic_complexity(root_node)
+        metrics.base.complexity_score = complexity
 
 
-class JavaScriptASTAnalyzer(ASTAnalyzer):
-    """Analyzer for JavaScript/TypeScript files using Abstract Syntax Tree"""
+    def _calculate_cyclomatic_complexity(self, root_node: Any) -> int:
+        """Calculate cyclomatic complexity for Python code"""
+        complexity = 1  # Start with 1
+        
+        # Branch keywords and operators
+        branch_types = [
+            "if_statement", "elif_clause", "else_clause",
+            "for_statement", "while_statement",
+            "try_statement", "except_clause", "finally_clause",
+            "and", "or", "conditional_expression"
+        ]
+        
+        def traverse(node):
+            nonlocal complexity
+            
+            if node.type in branch_types:
+                complexity += 1
+            
+            for child in node.children:
+                traverse(child)
+        
+        traverse(root_node)
+        return complexity
+
+
+class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
+    """Analyzer for JavaScript/TypeScript files using tree-sitter"""
 
     extensions = ['.js', '.jsx', '.ts', '.tsx']
+    language_name = "javascript"
+    grammar_file = "js-lang.so"
+    comment_types = ["comment", "comment_block", "jsx_comment", "multiline_comment"]
+
+    def __init__(self):
+        """Initialize the JavaScript analyzer"""
+        super().__init__()
+        self.__class__.initialize_parser()
 
     @classmethod
     def _get_language_name(cls) -> str:
+        """Return specific language name based on file extension"""
         return "javascript"  # Base language name, more specific detection in _detect_language
+
+    def _detect_language(self, file_path: str) -> str:
+        """Detect specific JS variant from file extension"""
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == '.jsx':
+            return "jsx"
+        elif ext == '.ts':
+            return "typescript"
+        elif ext == '.tsx':
+            return "tsx"
+        return "javascript"
+        
+    def _calculate_metrics(self, ast_data: Any, metrics: FileMetrics, content: str = None) -> None:
+        """Calculate JavaScript-specific metrics from the tree-sitter AST"""
+        if ast_data is None or isinstance(ast_data, Exception):
+            return
+        
+        root_node = ast_data.root_node
+        
+        # Initialize counters
+        class_count = 0
+        function_count = 0
+        import_count = 0
+        
+        # Process the AST
+        def process_node(node):
+            nonlocal class_count, function_count, import_count
+            
+            if node.type == "class_declaration":
+                class_count += 1
+            elif node.type in ["function_declaration", "arrow_function", "method_definition", 
+                               "generator_function_declaration", "function"]:
+                function_count += 1
+            elif node.type in ["import_statement", "import_declaration"]:
+                import_count += 1
+            
+            # Process children
+            for child in node.children:
+                process_node(child)
+        
+        # Start processing from root
+        process_node(root_node)
+        
+        # Update metrics
+        metrics.base.classes = class_count
+        metrics.base.functions = function_count
+        metrics.base.imports = import_count
+        
+        # Calculate cyclomatic complexity
+        complexity = self._calculate_cyclomatic_complexity(root_node)
+        metrics.base.complexity_score = complexity
+
+    def _calculate_cyclomatic_complexity(self, root_node: Any) -> int:
+        """Calculate cyclomatic complexity for JavaScript/TypeScript code"""
+        complexity = 1  # Start with 1
+        
+        # Branch keywords and operators
+        branch_types = [
+            "if_statement", "else_clause",
+            "for_statement", "for_in_statement", "for_of_statement",
+            "while_statement", "do_statement",
+            "try_statement", "catch_clause", "finally_clause",
+            "case_statement", "switch_statement",
+            "&&", "||", "?", "ternary_expression"
+        ]
+        
+        def traverse(node):
+            nonlocal complexity
+            
+            if node.type in branch_types:
+                complexity += 1
+            
+            for child in node.children:
+                traverse(child)
+        
+        traverse(root_node)
+        return complexity
+
+
+# Initialize the analyzers
+def initialize_analyzers():
+    """Initialize all tree-sitter analyzers"""
+    PythonASTAnalyzer.initialize_parser()
+    JavaScriptASTAnalyzer.initialize_parser()
+    console.print("[green]Initialized tree-sitter parsers for: Python, JavaScript[/green]")
 
 if __name__ == "__main__":
     analyzer = JavaScriptASTAnalyzer()
