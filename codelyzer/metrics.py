@@ -17,7 +17,7 @@ class BaseMetric:
     level: Optional[MetricLevel] = None
 
 
-class ComplexityLevel(MetricLevel):
+class ComplexityLevel(StrEnum):
     TRIVIAL = 'trivial'
     LOW = 'low'
     MODERATE = 'moderate'
@@ -26,7 +26,7 @@ class ComplexityLevel(MetricLevel):
     EXTREME = 'extreme'
 
 
-class SecurityLevel(MetricLevel):
+class SecurityLevel(StrEnum):
     SECURE = 'secure'
     LOW_RISK = 'low_risk'
     MEDIUM_RISK = 'medium_risk'
@@ -34,14 +34,14 @@ class SecurityLevel(MetricLevel):
     CRITICAL = 'critical'
 
 
-class CodeSmellSeverity(MetricLevel):
+class CodeSmellSeverity(StrEnum):
     NONE = 'none'
     MINOR = 'minor'
     MAJOR = 'major'
     CRITICAL = 'critical'
 
 
-class MaintainabilityLevel(MetricLevel):
+class MaintainabilityLevel(StrEnum):
     EXCELLENT = 'excellent'  # 85-100
     GOOD = 'good'  # 65-84
     MODERATE = 'moderate'  # 40-64

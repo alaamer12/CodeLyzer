@@ -213,7 +213,8 @@ class TreeSitterASTAnalyzer(ASTAnalyzer, ABC):
                 console.print(f"[red]Error: Grammar file not found: {grammar_path}[/red]")
                 return
 
-            language = Language(grammar_path, cls.language_name)
+            # Create a Language object with just the grammar file path
+            language = Language(grammar_path)
             parser = Parser()
             parser.language = language
             cls.language_parser = parser
@@ -286,7 +287,7 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
 
     def __init__(self):
         """Initialize the Python analyzer"""
-        super().__init__()
+        # Initialize the parser
         self.__class__.initialize_parser()
 
     @classmethod
@@ -381,7 +382,7 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
 
     def __init__(self):
         """Initialize the JavaScript analyzer"""
-        super().__init__()
+        # Initialize the parser
         self.__class__.initialize_parser()
 
     @classmethod
