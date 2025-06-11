@@ -486,12 +486,12 @@ class HeaderComponent(ReportComponent):
 
     @staticmethod
     def render(metrics: 'ProjectMetrics') -> str:
-        timestamp = format_timestamp()
         """Render the header HTML section"""
+        timestamp = format_timestamp()
         return f'''
         <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-12 text-center mb-8 rounded-3xl shadow-2xl relative overflow-hidden">
             <div class="absolute inset-0 opacity-30">
-                <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 100 100\\"><defs><pattern id=\\"grid\\" width=\\"10\\" height=\\"10\\" patternUnits=\\"userSpaceOnUse\\"><path d=\\"M 10 0 L 0 0 0 10\\" fill=\\"none\\" stroke=\\"rgba(255,255,255,0.1)\\" stroke-width=\\"0.5\\"/></pattern></defs><rect width=\\"100\\" height=\\"100\\" fill=\\"url(%23grid)\\"/></svg>');"></div>
+                <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 100 100%22%3E%3Cdefs%3E%3Cpattern id%3D%22grid%22 width%3D%2210%22 height%3D%2210%22 patternUnits%3D%22userSpaceOnUse%22%3E%3Cpath d%3D%22M 10 0 L 0 0 0 10%22 fill%3D%22none%22 stroke%3D%22rgba(255,255,255,0.1)%22 stroke-width%3D%220.5%22%2F%3E%3C%2Fpattern%3E%3C%2Fdefs%3E%3Crect width%3D%22100%22 height%3D%22100%22 fill%3D%22url(%23grid)%22%2F%3E%3C%2Fsvg%3E');"></div>
             </div>
             <div class="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-gradient-radial from-white/10 to-transparent animate-float"></div>
             <div class="relative z-10">
@@ -648,10 +648,13 @@ class HTMLReportGenerator:
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {{
             --text-primary: #1f2937;
             --text-secondary: #4b5563;
+            --tw-gradient-from: rgba(255, 255, 255, 0.1);
+            --tw-gradient-to: transparent;
         }}
         
         * {{
@@ -698,7 +701,7 @@ class HTMLReportGenerator:
         }}
     </style>
 </head>
-<body class="font-inter bg-gradient-to-br from-gray-50 via-white to-gray-50 text-gray-800 text-sm min-h-screen">
+<body class="font-inter bg-gray-50 text-gray-800 text-sm min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
         {HeaderComponent.render(metrics)}
         {MetricsGridComponent.render(metrics)}
