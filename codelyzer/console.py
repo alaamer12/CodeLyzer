@@ -2,9 +2,7 @@
 Console and display utilities for CodeLyzer.
 Centralizes all console output, logging, progress bars, and rich display components.
 """
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Any
 
 from rich.console import Console
 from rich.table import Table
@@ -14,7 +12,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeEl
 from rich import box
 from rich.layout import Layout
 
-from config import ProjectMetrics, ComplexityLevel
+from codelyzer.config import ProjectMetrics, ComplexityLevel
 
 # Main console instance used throughout the application
 console = Console()
@@ -272,7 +270,7 @@ def display_verbose_info(metrics: ProjectMetrics) -> None:
 def display_security_issues(metrics: ProjectMetrics) -> None:
     """Display security issues if any exist."""
     from collections import Counter
-    
+
     if any(f.security_issues for f in metrics.file_metrics):
         security_table = Table(title="🔒 Security Issues", box=box.ROUNDED)
         security_table.add_column("Issue Type", style="red")
@@ -287,4 +285,4 @@ def display_security_issues(metrics: ProjectMetrics) -> None:
             security_table.add_row(issue.replace('_', ' ').title(), str(count))
 
         console.print(security_table)
-        console.print() 
+        console.print()

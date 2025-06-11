@@ -5,10 +5,10 @@ from rich.table import Table
 from rich.panel import Panel
 from rich import box
 
-from core import AdvancedCodeAnalyzer, export_json_report
-from config import LANGUAGE_CONFIGS
-from console import console, create_summary_panel, display_initial_info, display_final_summary, display_verbose_info, create_and_display_layout
-from _html import generate_direct_html
+from codelyzer.core import AdvancedCodeAnalyzer, ReportExport
+from codelyzer.config import LANGUAGE_CONFIGS
+from codelyzer.console import console, create_summary_panel, display_initial_info, display_final_summary, display_verbose_info, create_and_display_layout
+from codelyzer._html import generate_direct_html
 
 app = typer.Typer(
     name="codelyzer",
@@ -48,7 +48,7 @@ def generate_reports(metrics, output_format: str, output_dir: str, project_path:
         output_path.mkdir(exist_ok=True)
 
         json_file = output_path / f"{project_path.name}_analysis.json"
-        export_json_report(metrics, str(json_file))
+        ReportExport(metrics, str(json_file)).to_json()
         console.print(f"[green]✅ JSON report saved:[/green] [link]{json_file}[/link]")
 
 

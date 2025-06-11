@@ -140,4 +140,3 @@ FILE_SIZE_LIMIT = 10 * 1024 * 1024  # 10MB
 TIMEOUT_SECONDS = 5  # seconds
 MAX_REPO_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
 IS_WINDOWS = platform.system() == 'Windows'
-

@@ -4,17 +4,17 @@ Enhanced Codebase Analyzer
 A powerful, robust tool for analyzing code repositories with beautiful terminal output.
 Supports multiple programming languages with detailed metrics and visualizations.
 """
-
+import pandas as pd
 import os
 import json
 import time
 from typing import Dict, List, Optional, Set
 
-from ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
-from config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, TIMEOUT_SECONDS
-from utils import FunctionWithTimeout, TimeoutError
-from console import console, create_analysis_progress_bar
-from helpers import StandardFileDiscovery, SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
+from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
+from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, TIMEOUT_SECONDS
+from codelyzer.utils import FunctionWithTimeout
+from codelyzer.console import console, create_analysis_progress_bar
+from codelyzer.helpers import StandardFileDiscovery, SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
     PatternBasedAnalyzer, ProjectMetricsProcessor
 
 
@@ -74,6 +74,7 @@ class AdvancedCodeAnalyzer:
         self.complexity_analyzer = ComplexityAnalyzer(LANGUAGE_CONFIGS)
         self.pattern_analyzer = PatternBasedAnalyzer(LANGUAGE_CONFIGS)
         self.metrics_processor = ProjectMetricsProcessor()
+        self.scoring = Scoring()
 
         # Initialize language-specific analyzers
         self.language_analyzers = initialize_analyzers()
@@ -106,7 +107,7 @@ class AdvancedCodeAnalyzer:
         return language is not None
 
     def _get_file_metrics_and_content(self, file_path: str, language: str, file_size: int) -> tuple[
-                                        Optional[FileMetrics], Optional[str]]:
+        Optional[FileMetrics], Optional[str]]:
         """Get metrics and content for a file using appropriate analyzer"""
         analyzer = self.language_analyzers.get(language)
         content = None
@@ -225,7 +226,7 @@ class AdvancedCodeAnalyzer:
         project_metrics.file_metrics.append(metrics)
 
         # Update aggregate metrics
-        project_metrics = self._update_aggregate_metrics(project_metrics, metrics)
+        project_metrics = self.scoring.update_aggregate_metrics(project_metrics, metrics)
 
         # Language stats
         if metrics.language:
@@ -236,20 +237,6 @@ class AdvancedCodeAnalyzer:
         if metrics.imports:
             for imp in metrics.imports:
                 project_metrics.dependencies[imp] = project_metrics.dependencies.get(imp, 0) + 1
-
-    @staticmethod
-    def _update_aggregate_metrics(project_metrics: ProjectMetrics, metrics: FileMetrics) -> ProjectMetrics:
-        """Update aggregate metrics"""
-        project_metrics.total_files += 1
-        project_metrics.total_loc += metrics.loc or 0
-        project_metrics.total_sloc += metrics.sloc or 0
-        project_metrics.total_comments += metrics.comments or 0
-        project_metrics.total_blanks += metrics.blanks or 0
-        project_metrics.total_classes += metrics.classes or 0
-        project_metrics.total_functions += metrics.functions or 0
-        project_metrics.total_methods += metrics.methods or 0
-        project_metrics.project_size += metrics.file_size or 0
-        return project_metrics
 
     @staticmethod
     def _show_progress_stats(current: int, total: int, start_time: float, language_stats: Dict) -> None:
@@ -266,49 +253,103 @@ class AdvancedCodeAnalyzer:
             console.print(f"[green]Top languages: {lang_summary}[/green]")
 
 
-def export_json_report(metrics: ProjectMetrics, output_path: str):
-    """Export detailed JSON report"""
-    report_data = {
-        'summary': {
-            'total_files': metrics.total_files,
-            'total_loc': metrics.total_loc,
-            'total_sloc': metrics.total_sloc,
-            'total_comments': metrics.total_comments,
-            'total_blanks': metrics.total_blanks,
-            'total_classes': metrics.total_classes,
-            'total_functions': metrics.total_functions,
-            'total_methods': metrics.total_methods,
-            'project_size': metrics.project_size,
-            'analysis_duration': metrics.analysis_duration,
-            'code_quality_score': metrics.code_quality_score,
-            'maintainability_score': metrics.maintainability_score
-        },
-        'languages': dict(metrics.languages),
-        'complexity_distribution': dict(metrics.complexity_distribution),
-        'dependencies': dict(metrics.dependencies),
-        'files': []
-    }
+class Scoring:
+    """Class for handling code scoring and metrics aggregation"""
 
-    for file_metrics in metrics.file_metrics:
-        report_data['files'].append({
-            'path': file_metrics.file_path,
-            'language': file_metrics.language,
-            'loc': file_metrics.loc,
-            'sloc': file_metrics.sloc,
-            'comments': file_metrics.comments,
-            'blanks': file_metrics.blanks,
-            'classes': file_metrics.classes,
-            'functions': file_metrics.functions,
-            'methods': file_metrics.methods,
-            'complexity_score': file_metrics.complexity_score,
-            'cyclomatic_complexity': file_metrics.cyclomatic_complexity,
-            'maintainability_index': file_metrics.maintainability_index,
-            'security_issues': file_metrics.security_issues,
-            'code_smells': file_metrics.code_smells,
-            'file_size': file_metrics.file_size,
-            'imports': file_metrics.imports,
-            'methods_per_class': file_metrics.methods_per_class
-        })
+    @staticmethod
+    def update_aggregate_metrics(project_metrics: ProjectMetrics, metrics: FileMetrics) -> ProjectMetrics:
+        """Update aggregate metrics"""
+        project_metrics.total_files += 1
+        project_metrics.total_loc += metrics.loc or 0
+        project_metrics.total_sloc += metrics.sloc or 0
+        project_metrics.total_comments += metrics.comments or 0
+        project_metrics.total_blanks += metrics.blanks or 0
+        project_metrics.total_classes += metrics.classes or 0
+        project_metrics.total_functions += metrics.functions or 0
+        project_metrics.total_methods += metrics.methods or 0
+        project_metrics.project_size += metrics.file_size or 0
+        return project_metrics
 
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(report_data, f, indent=2, default=str)
+
+class ReportExport:
+    """Class for exporting project metrics in various formats"""
+
+    def __init__(self, metrics: ProjectMetrics, output_path: str):
+        """
+        Initialize the report exporter
+        
+        Args:
+            metrics: The project metrics to export
+            output_path: Path where the report will be saved
+        """
+        self.metrics = metrics
+        self.output_path = output_path
+        self._prepare_report_data()
+
+    def _prepare_report_data(self) -> Dict:
+        """Prepare the report data structure"""
+        self.report_data = {
+            'summary': {
+                'total_files': self.metrics.total_files,
+                'total_loc': self.metrics.total_loc,
+                'total_sloc': self.metrics.total_sloc,
+                'total_comments': self.metrics.total_comments,
+                'total_blanks': self.metrics.total_blanks,
+                'total_classes': self.metrics.total_classes,
+                'total_functions': self.metrics.total_functions,
+                'total_methods': self.metrics.total_methods,
+                'project_size': self.metrics.project_size,
+                'analysis_duration': self.metrics.analysis_duration,
+                'code_quality_score': self.metrics.code_quality_score,
+                'maintainability_score': self.metrics.maintainability_score
+            },
+            'languages': dict(self.metrics.languages),
+            'complexity_distribution': dict(self.metrics.complexity_distribution),
+            'dependencies': dict(self.metrics.dependencies),
+            'files': []
+        }
+
+        for file_metrics in self.metrics.file_metrics:
+            self.report_data['files'].append({
+                'path': file_metrics.file_path,
+                'language': file_metrics.language,
+                'loc': file_metrics.loc,
+                'sloc': file_metrics.sloc,
+                'comments': file_metrics.comments,
+                'blanks': file_metrics.blanks,
+                'classes': file_metrics.classes,
+                'functions': file_metrics.functions,
+                'methods': file_metrics.methods,
+                'complexity_score': file_metrics.complexity_score,
+                'cyclomatic_complexity': file_metrics.cyclomatic_complexity,
+                'maintainability_index': file_metrics.maintainability_index,
+                'security_issues': file_metrics.security_issues,
+                'code_smells': file_metrics.code_smells,
+                'file_size': file_metrics.file_size,
+                'imports': file_metrics.imports,
+                'methods_per_class': file_metrics.methods_per_class
+            })
+
+        return self.report_data
+
+    def to_json(self) -> None:
+        """Export metrics to a JSON file"""
+        with open(self.output_path, 'w', encoding='utf-8') as f:
+            json.dump(self.report_data, f, indent=2, default=str)
+
+    def to_df(self) -> pd.DataFrame:
+        """
+        Export metrics to pandas DataFrames
+        
+        Returns:
+            DataFrame containing file metrics
+        """
+
+        # Create DataFrame for file metrics
+        files_df = pd.DataFrame(self.report_data['files'])
+
+        # Add summary as attributes to the DataFrame
+        for key, value in self.report_data['summary'].items():
+            files_df.attrs[key] = value
+
+        return files_df

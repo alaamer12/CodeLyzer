@@ -6,9 +6,9 @@ import tempfile
 from abc import ABC, abstractmethod
 from typing import Optional, Type, ClassVar, Dict, List, Any
 
-from config import FileMetrics, FILE_SIZE_LIMIT, TIMEOUT_SECONDS
-from console import console
-from utils import FunctionWithTimeout
+from codelyzer.config import FileMetrics, FILE_SIZE_LIMIT, TIMEOUT_SECONDS
+from codelyzer.console import console
+from codelyzer.utils import FunctionWithTimeout
 
 
 class ASTAnalyzer(ABC):

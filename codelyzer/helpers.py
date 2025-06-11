@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Protocol, Tuple, Union
+from typing import Dict, List, Optional, Set, Protocol, Union
 import re
 import math
 
-from config import DEFAULT_EXCLUDED_FILES, FileMetrics, ProjectMetrics, ComplexityLevel, FILE_SIZE_LIMIT, \
+from codelyzer.config import DEFAULT_EXCLUDED_FILES, FileMetrics, ProjectMetrics, ComplexityLevel, FILE_SIZE_LIMIT, \
     TIMEOUT_SECONDS
-from console import console
+from codelyzer.console import console
 
-from utils import FunctionWithTimeout, TimeoutError
+from codelyzer.utils import FunctionWithTimeout
 
 
 class FileDiscovery(Protocol):
