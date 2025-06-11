@@ -12,6 +12,150 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
+class PlotReportGenerator:
+    """Generate plotting components for codebase analysis reports."""
+    
+    def __init__(self):
+        self._language_labels_json = ""
+        self._language_data_json = ""
+        self._complexity_labels_json = ""
+        self._complexity_data_json = ""
+    
+    def prepare_chart_data(self, metrics: 'ProjectMetrics') -> None:
+        """Prepare JSON data for charts."""
+        self._language_labels_json = json.dumps(list(metrics.languages.keys()))
+        self._language_data_json = json.dumps(list(metrics.languages.values()))
+        
+        complexity_labels = [level.replace('_', ' ').title() for level in ComplexityLevel]
+        complexity_data = [metrics.complexity_distribution.get(level, 0) for level in ComplexityLevel]
+        
+        self._complexity_labels_json = json.dumps(complexity_labels)
+        self._complexity_data_json = json.dumps(complexity_data)
+    
+    def get_charts_grid_html(self) -> str:
+        """Get the charts grid HTML section."""
+        return '''
+        <div class="charts-grid fade-in">
+            <div class="chart-container">
+                <h3><i class="fas fa-globe"></i> Language Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="languageChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3><i class="fas fa-layer-group"></i> Complexity Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="complexityChart"></canvas>
+                </div>
+            </div>
+        </div>'''
+    
+    def get_chart_javascript(self) -> str:
+        """Get the JavaScript section for charts and animations."""
+        return f'''
+        const chartOptions = {{
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {{
+                legend: {{
+                    position: 'bottom',
+                    labels: {{
+                        usePointStyle: true,
+                        padding: 20,
+                        font: {{
+                            size: 12
+                        }}
+                    }}
+                }}
+            }}
+        }};
+
+        // Language Distribution Chart
+        const languageCtx = document.getElementById('languageChart').getContext('2d');
+        new Chart(languageCtx, {{
+            type: 'doughnut',
+            data: {{
+                labels: {self._language_labels_json},
+                datasets: [{{
+                    data: {self._language_data_json},
+                    backgroundColor: [
+                        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                        '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#6366f1'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverBorderWidth: 3
+                }}]
+            }},
+            options: {{
+                ...chartOptions,
+                cutout: '60%',
+                plugins: {{
+                    ...chartOptions.plugins,
+                    tooltip: {{
+                        callbacks: {{
+                            label: function(context) {{
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.raw / total) * 100).toFixed(1);
+                                return context.label + ': ' + context.raw + ' files (' + percentage + '%)';
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }});
+        
+        // Complexity Distribution Chart
+        const complexityCtx = document.getElementById('complexityChart').getContext('2d');
+        new Chart(complexityCtx, {{
+            type: 'bar',
+            data: {{
+                labels: {self._complexity_labels_json},
+                datasets: [{{
+                    label: 'Number of Files',
+                    data: {self._complexity_data_json},
+                    backgroundColor: [
+                        '#10b981', '#22c55e', '#f59e0b', '#f97316', '#ef4444', '#dc2626'
+                    ],
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }}]
+            }},
+            options: {{
+                ...chartOptions,
+                plugins: {{
+                    ...chartOptions.plugins,
+                    legend: {{
+                        display: false
+                    }}
+                }},
+                scales: {{
+                    x: {{
+                        grid: {{
+                            display: false
+                        }},
+                        ticks: {{
+                            font: {{
+                                size: 11
+                            }}
+                        }}
+                    }},
+                    y: {{
+                        beginAtZero: true,
+                        grid: {{
+                            color: '#f3f4f6'
+                        }},
+                        ticks: {{
+                            font: {{
+                                size: 11
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }});'''
+
 
 class HTMLReportGenerator:
     """Generate HTML reports for codebase analysis metrics."""
@@ -20,10 +164,7 @@ class HTMLReportGenerator:
         self._timestamp = None
         self._complex_files_rows = ""
         self._dependencies_rows = ""
-        self._language_labels_json = ""
-        self._language_data_json = ""
-        self._complexity_labels_json = ""
-        self._complexity_data_json = ""
+        self._plot_generator = PlotReportGenerator()
     
     def create(self, metrics: 'ProjectMetrics') -> str:
         """Generate HTML report for the given metrics."""
@@ -35,7 +176,7 @@ class HTMLReportGenerator:
         self._timestamp = self._format_timestamp()
         self._complex_files_rows = self._generate_complex_files_rows(metrics)
         self._dependencies_rows = self._generate_dependencies_rows(metrics)
-        self._prepare_chart_data(metrics)
+        self._plot_generator.prepare_chart_data(metrics)
     
     def _format_timestamp(self) -> str:
         """Format the current timestamp for display."""
@@ -118,17 +259,6 @@ class HTMLReportGenerator:
         """Get the top 15 dependencies sorted by usage count."""
         return sorted(metrics.dependencies.items(), key=lambda x: x[1], reverse=True)[:15]
     
-    def _prepare_chart_data(self, metrics: 'ProjectMetrics') -> None:
-        """Prepare JSON data for charts."""
-        self._language_labels_json = json.dumps(list(metrics.languages.keys()))
-        self._language_data_json = json.dumps(list(metrics.languages.values()))
-        
-        complexity_labels = [level.replace('_', ' ').title() for level in ComplexityLevel]
-        complexity_data = [metrics.complexity_distribution.get(level, 0) for level in ComplexityLevel]
-        
-        self._complexity_labels_json = json.dumps(complexity_labels)
-        self._complexity_data_json = json.dumps(complexity_data)
-    
     def _build_html_template(self, metrics: 'ProjectMetrics') -> str:
         """Build the complete HTML template with all data inserted."""
         return f'''<!DOCTYPE html>
@@ -147,7 +277,7 @@ class HTMLReportGenerator:
     <div class="container">
         {self._get_header_html()}
         {self._get_metrics_grid_html(metrics)}
-        {self._get_charts_grid_html()}
+        {self._plot_generator.get_charts_grid_html()}
         {self._get_tables_grid_html()}
     </div>
     {self._get_javascript()}
@@ -585,25 +715,6 @@ class HTMLReportGenerator:
             </div>
         </div>'''
     
-    def _get_charts_grid_html(self) -> str:
-        """Get the charts grid HTML section."""
-        return '''
-        <div class="charts-grid fade-in">
-            <div class="chart-container">
-                <h3><i class="fas fa-globe"></i> Language Distribution</h3>
-                <div class="chart-wrapper">
-                    <canvas id="languageChart"></canvas>
-                </div>
-            </div>
-            
-            <div class="chart-container">
-                <h3><i class="fas fa-layer-group"></i> Complexity Distribution</h3>
-                <div class="chart-wrapper">
-                    <canvas id="complexityChart"></canvas>
-                </div>
-            </div>
-        </div>'''
-    
     def _get_tables_grid_html(self) -> str:
         """Get the tables grid HTML section."""
         return f'''
@@ -654,107 +765,7 @@ class HTMLReportGenerator:
         """Get the JavaScript section for charts and animations."""
         return f'''
     <script>
-        const chartOptions = {{
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {{
-                legend: {{
-                    position: 'bottom',
-                    labels: {{
-                        usePointStyle: true,
-                        padding: 20,
-                        font: {{
-                            size: 12
-                        }}
-                    }}
-                }}
-            }}
-        }};
-
-        // Language Distribution Chart
-        const languageCtx = document.getElementById('languageChart').getContext('2d');
-        new Chart(languageCtx, {{
-            type: 'doughnut',
-            data: {{
-                labels: {self._language_labels_json},
-                datasets: [{{
-                    data: {self._language_data_json},
-                    backgroundColor: [
-                        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-                        '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#6366f1'
-                    ],
-                    borderWidth: 2,
-                    borderColor: '#ffffff',
-                    hoverBorderWidth: 3
-                }}]
-            }},
-            options: {{
-                ...chartOptions,
-                cutout: '60%',
-                plugins: {{
-                    ...chartOptions.plugins,
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((context.raw / total) * 100).toFixed(1);
-                                return context.label + ': ' + context.raw + ' files (' + percentage + '%)';
-                            }}
-                        }}
-                    }}
-                }}
-            }}
-        }});
-        
-        // Complexity Distribution Chart
-        const complexityCtx = document.getElementById('complexityChart').getContext('2d');
-        new Chart(complexityCtx, {{
-            type: 'bar',
-            data: {{
-                labels: {self._complexity_labels_json},
-                datasets: [{{
-                    label: 'Number of Files',
-                    data: {self._complexity_data_json},
-                    backgroundColor: [
-                        '#10b981', '#22c55e', '#f59e0b', '#f97316', '#ef4444', '#dc2626'
-                    ],
-                    borderRadius: 6,
-                    borderSkipped: false,
-                }}]
-            }},
-            options: {{
-                ...chartOptions,
-                plugins: {{
-                    ...chartOptions.plugins,
-                    legend: {{
-                        display: false
-                    }}
-                }},
-                scales: {{
-                    x: {{
-                        grid: {{
-                            display: false
-                        }},
-                        ticks: {{
-                            font: {{
-                                size: 11
-                            }}
-                        }}
-                    }},
-                    y: {{
-                        beginAtZero: true,
-                        grid: {{
-                            color: '#f3f4f6'
-                        }},
-                        ticks: {{
-                            font: {{
-                                size: 11
-                            }}
-                        }}
-                    }}
-                }}
-            }}
-        }});
+        {self._plot_generator.get_chart_javascript()}
         
         // Add loading states and animations
         document.addEventListener('DOMContentLoaded', function() {{
@@ -767,7 +778,6 @@ class HTMLReportGenerator:
             }});
         }});
     </script>'''
-
 
 
 def generate_direct_html(metrics: 'ProjectMetrics') -> str:
