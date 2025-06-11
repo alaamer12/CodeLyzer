@@ -12,16 +12,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 import re
 import math
-from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
-from rich.markdown import Markdown
-from rich import box
 
 from ast_analyzers import PythonASTAnalyzer
 from config import DEFAULT_EXCLUDED_DIRS, DEFAULT_EXCLUDED_FILES, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, \
-    ComplexityLevel, console, FILE_SIZE_LIMIT, TIMEOUT_SECONDS
+    ComplexityLevel, FILE_SIZE_LIMIT, TIMEOUT_SECONDS
 from utils import FunctionWithTimeout, TimeoutError
+from console import console, create_analysis_progress_bar
 
 
 
@@ -365,7 +361,7 @@ class AdvancedCodeAnalyzer:
 
                 # Maintainability index (simplified)
                 if metrics.sloc > 0:
-                    metrics.maintainability_index = max(0, 171 - 5.2 * math.log(metrics.sloc) -
+                    metrics.maintainability_index = max(0.0, 171 - 5.2 * math.log(metrics.sloc) -
                                                         0.23 * (metrics.cyclomatic_complexity or 1) -
                                                         16.2 * math.log(max(1, len(metrics.imports or []))))
             except Exception as e:
@@ -406,19 +402,7 @@ class AdvancedCodeAnalyzer:
             console.print("[yellow]No files to analyze[/yellow]")
             return project_metrics
 
-        with Progress(
-                SpinnerColumn(),
-                TextColumn("[bold blue]Processing...", justify="right"),
-                BarColumn(bar_width=40),
-                "[progress.percentage]{task.percentage:>3.1f}%",
-                "•",
-                TextColumn("[cyan]{task.completed}/{task.total}[/cyan]", justify="right"),
-                "•",
-                TimeElapsedColumn(),
-                "•",
-                TimeRemainingColumn(),
-                console=console
-        ) as progress:
+        with create_analysis_progress_bar() as progress:
             task = progress.add_task("[cyan]Analyzing files...", total=total_files)
 
             # Process files
@@ -544,163 +528,6 @@ class AdvancedCodeAnalyzer:
 
             avg_maintainability = sum(f.maintainability_index for f in metrics.file_metrics) / len(metrics.file_metrics)
             metrics.maintainability_score = max(0, min(100, int(avg_maintainability)))
-
-
-def create_summary_panel(metrics: ProjectMetrics) -> Panel:
-    """Create summary panel"""
-    summary_text = f"""
-📊 **Project Overview**
-• Files analyzed: {metrics.total_files:,}
-• Lines of code: {metrics.total_loc:,}
-• Source lines: {metrics.total_sloc:,}
-• Comments: {metrics.total_comments:,}
-• Blank lines: {metrics.total_blanks:,}
-
-🏗️ **Code Structure**
-• Classes: {metrics.total_classes:,}
-• Functions: {metrics.total_functions:,}
-• Methods: {metrics.total_methods:,}
-
-📈 **Quality Metrics**
-• Code quality: {metrics.code_quality_score:.1f}/100
-• Maintainability: {metrics.maintainability_score:.1f}/100
-• Analysis time: {metrics.analysis_duration:.2f}s
-"""
-
-    return Panel(
-        Markdown(summary_text),
-        title="📋 Analysis Summary",
-        border_style="blue",
-        padding=(1, 2),
-        title_align="center",
-        highlight=True
-    )
-
-
-def create_language_distribution_table(metrics: ProjectMetrics) -> Table:
-    """Create language distribution table"""
-    table = Table(
-        title="🌐 Language Distribution",
-        box=box.ROUNDED,
-        title_style="bold blue",
-        border_style="cyan",
-        highlight=True
-    )
-    table.add_column("Language", style="cyan", no_wrap=True)
-    table.add_column("Files", justify="right", style="magenta")
-    table.add_column("Percentage", justify="right", style="green")
-
-    total_files = sum(metrics.languages.values())
-    for language, count in sorted(metrics.languages.items(), key=lambda x: x[1], reverse=True):
-        percentage = (count / total_files) * 100 if total_files > 0 else 0
-        table.add_row(
-            language.title(),
-            str(count),
-            f"{percentage:.1f}%"
-        )
-
-    return table
-
-
-def create_complexity_table(metrics: ProjectMetrics) -> Table:
-    """Create complexity distribution table"""
-    table = Table(
-        title="⚡ Complexity Distribution",
-        box=box.ROUNDED,
-        title_style="bold blue",
-        border_style="cyan",
-        highlight=True
-    )
-    table.add_column("Complexity Level", style="cyan")
-    table.add_column("Files", justify="right", style="magenta")
-    table.add_column("Percentage", justify="right", style="green")
-
-    total_files = sum(metrics.complexity_distribution.values())
-
-    for level in ComplexityLevel:
-        # noinspection PyTypeChecker
-        count = metrics.complexity_distribution.get(level, 0)
-        percentage = (count / total_files) * 100 if total_files > 0 else 0
-
-        # Color coding
-        if level in [ComplexityLevel.TRIVIAL, ComplexityLevel.LOW]:
-            style = "green"
-        elif level == ComplexityLevel.MODERATE:
-            style = "yellow"
-        else:
-            style = "red"
-
-        table.add_row(
-            level.replace('_', ' ').title(),
-            f"[{style}]{count}[/{style}]",
-            f"[{style}]{percentage:.1f}%[/{style}]"
-        )
-
-    return table
-
-
-def create_hotspots_table(metrics: ProjectMetrics) -> Table:
-    """Create code hotspots table"""
-    table = Table(
-        title="🔥 Code Hotspots (Most Complex Files)",
-        box=box.ROUNDED,
-        title_style="bold blue",
-        border_style="cyan",
-        highlight=True
-    )
-    table.add_column("File", style="cyan", max_width=50)
-    table.add_column("Lines", justify="right", style="magenta")
-    table.add_column("Complexity", justify="right", style="red")
-    table.add_column("Issues", justify="right", style="yellow")
-
-    for file_metrics in metrics.most_complex_files[:10]:
-        # Handle paths on different drives by using Path
-        try:
-            # Try relative path first
-            relative_path = os.path.relpath(file_metrics.file_path)
-        except ValueError:
-            # If on a different drive, just use the basename or full path
-            path_obj = Path(file_metrics.file_path)
-            # Use parent directory + filename for better context
-            if path_obj.parent.name:
-                relative_path = str(Path(path_obj.parent.name) / path_obj.name)
-            else:
-                relative_path = path_obj.name
-
-        issues = len(file_metrics.security_issues) + len(file_metrics.code_smells)
-
-        # Color code based on issue count
-        issue_style = "green" if issues == 0 else "yellow" if issues < 3 else "red"
-
-        table.add_row(
-            relative_path,
-            str(file_metrics.sloc),
-            f"{file_metrics.complexity_score:.0f}",
-            f"[{issue_style}]{issues if issues > 0 else '✅'}[/{issue_style}]"
-        )
-
-    return table
-
-
-def create_dependencies_table(metrics: ProjectMetrics) -> Table:
-    """Create top dependencies table"""
-    table = Table(
-        title="📦 Top Dependencies",
-        box=box.ROUNDED,
-        title_style="bold blue",
-        border_style="cyan",
-        highlight=True
-    )
-    table.add_column("Module", style="cyan")
-    table.add_column("Usage Count", justify="right", style="magenta")
-
-    # Get top 15 dependencies
-    top_deps = sorted(metrics.dependencies.items(), key=lambda x: x[1], reverse=True)[:15]
-
-    for module, count in top_deps:
-        table.add_row(module, str(count))
-
-    return table
 
 
 def export_json_report(metrics: ProjectMetrics, output_path: str):

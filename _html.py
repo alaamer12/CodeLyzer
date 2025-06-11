@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-from config import ProjectMetrics, ComplexityLevel, console
+from config import ProjectMetrics, ComplexityLevel
 
 class HTMLReportGenerator:
     """HTML report generator class - used for direct output to string"""

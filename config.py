@@ -3,9 +3,6 @@ from enum import StrEnum
 
 import platform
 from typing import Dict, List
-from rich.console import Console
-
-console = Console()
 
 # Language configurations
 LANGUAGE_CONFIGS = {
