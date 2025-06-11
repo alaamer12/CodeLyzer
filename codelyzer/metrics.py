@@ -390,6 +390,11 @@ class ProjectMetrics:
     def maintainability_score(self) -> float:
         return self.complexity.maintainability_score
 
+    @property
+    def language_distribution(self) -> Dict[str, int]:
+        """Get the language distribution dictionary"""
+        return self.base.languages
+
     def add_custom_metric(self, name: str, value: Any) -> None:
         """Add a custom metric"""
         self.custom_metrics[name] = value

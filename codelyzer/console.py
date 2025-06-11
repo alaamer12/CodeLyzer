@@ -2,9 +2,8 @@
 Console and display utilities for CodeLyzer.
 Centralizes all console output, logging, progress bars, and rich display components.
 """
-from ast import Dict
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Dict
 
 from rich import box
 from rich.console import Console
@@ -113,6 +112,7 @@ def create_complexity_table(metrics: ProjectMetrics) -> Table:
 
     return table
 
+
 def create_table(title: str, box: Box, title_style: str, border_style: str, highlight: bool) -> Table:
     """Create a table with the given parameters."""
     return Table(
@@ -123,11 +123,94 @@ def create_table(title: str, box: Box, title_style: str, border_style: str, high
         highlight=highlight
     )
 
+
 def create_table_columns(table: Table, columns: Dict[str, Dict[str, Any]]) -> Table:
     """Update a table with the given columns."""
     for column_name, column_config in columns.items():
         table.add_column(column_name, **column_config)
     return table
+
+
+def _get_file_relative_path(file_path: str) -> str:
+    """Get a readable relative path for display.
+    
+    Args:
+        file_path: The absolute file path
+        
+    Returns:
+        A simplified relative path for display
+    """
+    try:
+        # Try relative path first
+        relative_path = str(Path(file_path).relative_to(Path.cwd()))
+    except ValueError:
+        # If on a different drive, just use the basename or full path
+        path_obj = Path(file_path)
+        # Use parent directory + filename for better context
+        if path_obj.parent.name:
+            relative_path = str(Path(path_obj.parent.name) / path_obj.name)
+        else:
+            relative_path = path_obj.name
+    
+    return relative_path
+
+
+def _get_issue_style(issue_count: int) -> str:
+    """Determine the style color based on issue count.
+    
+    Args:
+        issue_count: Number of issues in the file
+        
+    Returns:
+        Style color name
+    """
+    if issue_count == 0:
+        return "green"
+    elif issue_count < 3:
+        return "yellow"
+    else:
+        return "red"
+
+
+def _get_issue_display(issue_count: int, style: str) -> str:
+    """Format the issue display with appropriate styling.
+    
+    Args:
+        issue_count: Number of issues in the file
+        style: Style color to use
+        
+    Returns:
+        Formatted issue string
+    """
+    display_text = "✅" if issue_count == 0 else str(issue_count)
+    return f"[{style}]{display_text}[/{style}]"
+
+
+def _create_hotspots_table_columns() -> Dict[str, Dict[str, Any]]:
+    """Define the columns for the hotspots table.
+    
+    Returns:
+        Dictionary of column configurations
+    """
+    return {
+        "file": {"style": "cyan", "max_width": 50},
+        "lines": {"justify": "right", "style": "magenta"},
+        "complexity": {"justify": "right", "style": "red"},
+        "issues": {"justify": "right", "style": "yellow"}
+    }
+
+
+def _build_file_metrics_map(metrics: ProjectMetrics) -> Dict[str, Any]:
+    """Create a mapping of file paths to their metrics for quick lookup.
+    
+    Args:
+        metrics: Project metrics data
+        
+    Returns:
+        Dictionary mapping file paths to FileMetrics objects
+    """
+    return {fm.file_path: fm for fm in metrics.file_metrics}
+
 
 def create_hotspots_table(metrics: ProjectMetrics) -> Table:
     """Create a table showing code hotspots (most complex files)."""
@@ -138,46 +221,28 @@ def create_hotspots_table(metrics: ProjectMetrics) -> Table:
         border_style="cyan",
         highlight=True
     )
-    columns = {
-        "file": {"style": "cyan", "max_width": 50},
-        "lines": {"justify": "right", "style": "magenta"},
-        "complexity": {"justify": "right", "style": "red"},
-        "issues": {"justify": "right", "style": "yellow"}
-    }
+    
+    columns = _create_hotspots_table_columns()
     create_table_columns(table, columns)
 
     # Create a mapping of file paths to file metrics for quick lookup
-    file_metrics_map = {fm.file_path: fm for fm in metrics.file_metrics}
-    
+    file_metrics_map = _build_file_metrics_map(metrics)
+
     # Loop through the most complex file paths and find their corresponding FileMetrics objects
     for file_path in metrics.most_complex_files[:10]:
         # Get the FileMetrics object for this file path
         file_metrics = file_metrics_map.get(file_path)
-        
+
         if file_metrics:
-            # Handle paths on different drives by using Path
-            try:
-                # Try relative path first
-                relative_path = str(Path(file_metrics.file_path).relative_to(Path.cwd()))
-            except ValueError:
-                # If on a different drive, just use the basename or full path
-                path_obj = Path(file_metrics.file_path)
-                # Use parent directory + filename for better context
-                if path_obj.parent.name:
-                    relative_path = str(Path(path_obj.parent.name) / path_obj.name)
-                else:
-                    relative_path = path_obj.name
-
+            relative_path = _get_file_relative_path(file_metrics.file_path)
             issues = len(file_metrics.security_issues) + len(file_metrics.code_smells_list)
-
-            # Color code based on issue count
-            issue_style = "green" if issues == 0 else "yellow" if issues < 3 else "red"
+            issue_style = _get_issue_style(issues)
 
             table.add_row(
                 relative_path,
                 str(file_metrics.sloc),
                 f"{file_metrics.complexity_score:.0f}",
-                f"[{issue_style}]{issues if issues > 0 else '✅'}[/{issue_style}]"
+                _get_issue_display(issues, issue_style)
             )
 
     return table

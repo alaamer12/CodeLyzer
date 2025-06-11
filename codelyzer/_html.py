@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, TypeVar
 
-from codelyzer.metrics import ProjectMetrics, SecurityLevel, CodeSmellSeverity
+from codelyzer.metrics import ProjectMetrics, SecurityLevel
 
 T = TypeVar('T', bound='ChartData')
 
@@ -137,11 +137,14 @@ class SecurityIssuesChartData(ChartData):
 
         for file_metric in metrics.file_metrics:
             for issue in file_metric.security_issues:
-                if issue.level == SecurityLevel.CRITICAL:
+                level = issue.get('level', SecurityLevel.MEDIUM_RISK)
+                severity = issue.get('severity', 'medium').lower()
+
+                if level == SecurityLevel.CRITICAL or severity == 'critical':
                     security_counts["Critical"] += 1
-                elif issue.level == SecurityLevel.HIGH:
+                elif level == SecurityLevel.HIGH_RISK or severity == 'high':
                     security_counts["High"] += 1
-                elif issue.level == SecurityLevel.MEDIUM:
+                elif level == SecurityLevel.MEDIUM_RISK or severity == 'medium':
                     security_counts["Medium"] += 1
                 else:
                     security_counts["Low"] += 1
@@ -174,9 +177,11 @@ class CodeSmellsChartData(ChartData):
 
         for file_metric in metrics.file_metrics:
             for smell in file_metric.code_smells_list:
-                if smell.severity == CodeSmellSeverity.CRITICAL:
+                severity = smell.get('severity', 'minor').lower()
+
+                if severity == 'critical':
                     smell_counts["Critical"] += 1
-                elif smell.severity == CodeSmellSeverity.MAJOR:
+                elif severity == 'major':
                     smell_counts["Major"] += 1
                 else:
                     smell_counts["Minor"] += 1
@@ -202,9 +207,19 @@ class ComplexFilesTableComponent(TableComponent):
             HTML string for the complex files table
         """
         rows = ""
-        for file_metrics in metrics.most_complex_files[:15]:
+
+        # Create a mapping of file paths to file metrics for quick lookup
+        file_metrics_map = {fm.file_path: fm for fm in metrics.file_metrics}
+
+        # Loop through the most complex file paths and find corresponding FileMetrics objects
+        for file_path in metrics.most_complex_files[:15]:
+            # Get the FileMetrics object for this file path
+            file_metrics = file_metrics_map.get(file_path)
+
+            if not file_metrics:
+                continue
+
             # Extract the relative path
-            file_path = file_metrics.file_path
             relative_path = file_path.replace(os.getcwd(), "").lstrip(os.sep).replace("\\", "/")
 
             # Count issues
@@ -276,23 +291,105 @@ class DependenciesTableComponent(TableComponent):
         Returns:
             HTML string for the dependencies table
         """
+        rows = DependenciesTableComponent._generate_dependency_rows(metrics)
+        return DependenciesTableComponent._create_dependencies_table(rows)
+
+    @staticmethod
+    def _generate_dependency_rows(metrics: 'ProjectMetrics') -> str:
+        """Generate HTML rows for dependencies
+        
+        Args:
+            metrics: ProjectMetrics object containing analysis data
+            
+        Returns:
+            HTML string containing table rows
+        """
+        # Check if dependencies exist and are structured as expected
+        if not DependenciesTableComponent._has_valid_dependencies(metrics):
+            return DependenciesTableComponent._create_empty_row()
+
+        try:
+            return DependenciesTableComponent._format_dependency_rows(metrics.structure.dependencies)
+        except Exception:
+            return DependenciesTableComponent._create_error_row()
+
+    @staticmethod
+    def _has_valid_dependencies(metrics: 'ProjectMetrics') -> bool:
+        """Check if metrics contains valid dependencies
+        
+        Args:
+            metrics: ProjectMetrics object containing analysis data
+            
+        Returns:
+            True if dependencies exist and are properly structured
+        """
+        return hasattr(metrics.structure, 'dependencies') and isinstance(metrics.structure.dependencies, dict)
+
+    @staticmethod
+    def _format_dependency_rows(dependencies: dict) -> str:
+        """Format dependency data into HTML rows
+        
+        Args:
+            dependencies: Dictionary of dependencies with name->count mapping
+            
+        Returns:
+            HTML string with formatted rows
+        """
         rows = ""
-        if hasattr(metrics, 'dependencies'):
-            for dep in metrics.dependencies[:15]:
-                rows += f'''
-            <tr class="hover:bg-gray-50 hover:scale-[1.005] transition-all duration-200">
-                <td class="px-6 py-4 border-b border-gray-200">
-                    <div class="flex items-center gap-2 font-mono text-sm text-gray-600 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap bg-gray-50 px-2 py-1 rounded border border-gray-200">
-                        <i class="fas fa-cubes" aria-hidden="true"></i>
-                        {dep.name}
-                    </div>
-                </td>
-                <td class="px-6 py-4 border-b border-gray-200"><span class="font-semibold text-gray-900">{dep.version}</span></td>
-                <td class="px-6 py-4 border-b border-gray-200">
-                    {dep.license if dep.license else '<span class="text-gray-400">Unknown</span>'}
+        for name, count in list(dependencies.items())[:15]:  # Limit to 15 items
+            rows += f'''
+                <tr class="hover:bg-gray-50 hover:scale-[1.005] transition-all duration-200">
+                    <td class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex items-center gap-2 font-mono text-sm text-gray-600 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                            <i class="fas fa-cubes" aria-hidden="true"></i>
+                            {name}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 border-b border-gray-200"><span class="font-semibold text-gray-900">{count}</span></td>
+                    <td class="px-6 py-4 border-b border-gray-200">
+                        <span class="text-gray-400">-</span>
+                    </td>
+                </tr>'''
+        return rows
+
+    @staticmethod
+    def _create_empty_row() -> str:
+        """Create a placeholder row when no dependencies exist
+        
+        Returns:
+            HTML string for empty state
+        """
+        return '''
+            <tr>
+                <td class="px-6 py-4 border-b border-gray-200" colspan="3">
+                    <div class="text-center text-gray-500">No dependency information available</div>
                 </td>
             </tr>'''
 
+    @staticmethod
+    def _create_error_row() -> str:
+        """Create a placeholder row when an error occurs processing dependencies
+        
+        Returns:
+            HTML string for error state
+        """
+        return '''
+                <tr>
+                    <td class="px-6 py-4 border-b border-gray-200" colspan="3">
+                        <div class="text-center text-gray-500">No dependency information available</div>
+                    </td>
+                </tr>'''
+
+    @staticmethod
+    def _create_dependencies_table(rows: str) -> str:
+        """Create the complete dependencies table with header and rows
+        
+        Args:
+            rows: HTML string containing table rows
+            
+        Returns:
+            Complete HTML table with container
+        """
         return f'''
         <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 h-full">
             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
@@ -388,7 +485,8 @@ class HeaderComponent(ReportComponent):
     """Header component for HTML report"""
 
     @staticmethod
-    def render(metrics: 'ProjectMetrics', timestamp: str) -> str:
+    def render(metrics: 'ProjectMetrics') -> str:
+        timestamp = format_timestamp()
         """Render the header HTML section"""
         return f'''
         <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-12 text-center mb-8 rounded-3xl shadow-2xl relative overflow-hidden">
@@ -507,7 +605,6 @@ class HTMLReportGenerator:
 
     def __init__(self) -> None:
         """Initialize the HTML report generator."""
-        self._timestamp: str = ""
         self._plot_generator = PlotReportGenerator()
 
     def create(self, metrics: 'ProjectMetrics') -> str:
@@ -528,7 +625,6 @@ class HTMLReportGenerator:
         Args:
             metrics: ProjectMetrics object containing analysis data
         """
-        self._timestamp = format_timestamp()
         self._plot_generator.prepare_chart_data(metrics)
 
     def _build_html_template(self, metrics: 'ProjectMetrics') -> str:
@@ -604,7 +700,7 @@ class HTMLReportGenerator:
 </head>
 <body class="font-inter bg-gradient-to-br from-gray-50 via-white to-gray-50 text-gray-800 text-sm min-h-screen">
     <div class="max-w-7xl mx-auto p-6">
-        {HeaderComponent.render(metrics, self._timestamp)}
+        {HeaderComponent.render(metrics)}
         {MetricsGridComponent.render(metrics)}
         {self._plot_generator.get_charts_grid_html()}
         

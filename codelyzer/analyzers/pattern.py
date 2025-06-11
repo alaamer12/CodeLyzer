@@ -1,5 +1,6 @@
-from typing import Any, Dict, List
 import re
+from typing import Any, Dict, List, Union, Optional
+
 from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider
 
 
@@ -14,7 +15,7 @@ class PatternBasedAnalyzer(MetricProvider):
             "jsx": self._get_js_patterns()
         }
 
-    def analyze_file(self, file_path_or_metrics: str | FileMetrics, file_content: str = None, ast_data: Any = None) -> None | FileMetrics:
+    def analyze_file(self, file_path_or_metrics: Union[str, FileMetrics], file_content: str = None, ast_data: Any = None) -> Optional[FileMetrics]:
         """
         Analyze file for design patterns and anti-patterns.
         Can be called in two ways:
@@ -23,7 +24,6 @@ class PatternBasedAnalyzer(MetricProvider):
         """
         # Handle the direct file path case (from core.py)
         if isinstance(file_path_or_metrics, str):
-            from pathlib import Path
             from codelyzer.metrics import create_file_metrics
             
             file_path = file_path_or_metrics
