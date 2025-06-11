@@ -1,11 +1,115 @@
 import json
 import os
 from datetime import datetime
-from typing import Dict, Any, TypeVar
+from typing import Dict, Any, TypeVar, Literal
 
 from codelyzer.metrics import ProjectMetrics, SecurityLevel
 
 T = TypeVar('T', bound='ChartData')
+
+# Theme constants
+ThemeType = Literal["light", "dark"]
+
+class ThemeColors:
+    """Theme color constants for report styling"""
+    
+    # Light theme colors
+    LIGHT = {
+        # Base colors
+        "bg_primary": "#f9fafb",
+        "bg_secondary": "#ffffff",
+        "text_primary": "#1f2937",
+        "text_secondary": "#4b5563",
+        "border": "#e5e7eb",
+        "border_secondary": "#d1d5db",
+        
+        # Brand colors
+        "brand_primary": "#3b82f6",
+        "brand_primary_dark": "#2563eb",
+        "brand_secondary": "#60a5fa",
+        "brand_gradient_from": "#3b82f6",
+        "brand_gradient_to": "#2563eb",
+        
+        # Status colors
+        "success": "#22c55e",
+        "success_light": "#dcfce7",
+        "success_dark": "#16a34a",
+        "warning": "#eab308",
+        "warning_light": "#fef9c3",
+        "warning_dark": "#ca8a04",
+        "danger": "#ef4444",
+        "danger_light": "#fee2e2",
+        "danger_dark": "#dc2626",
+        "info": "#06b6d4",
+        "info_light": "#cffafe",
+        "info_dark": "#0891b2",
+        
+        # UI Element colors
+        "card_shadow": "rgba(0, 0, 0, 0.1)",
+        "header_pattern": "rgba(255, 255, 255, 0.1)",
+        "header_gradient_overlay": "rgba(255, 255, 255, 0.1)",
+        
+        # Chart colors
+        "chart_colors": [
+            "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+            "#06b6d4", "#f97316", "#84cc16", "#ec4899", "#6366f1"
+        ],
+        
+        # Component specific colors
+        "complexity_low": "bg-green-100 text-green-800",
+        "complexity_medium": "bg-yellow-100 text-yellow-800",
+        "complexity_high": "bg-orange-100 text-orange-800",
+        "complexity_very_high": "bg-red-100 text-red-800",
+    }
+    
+    # Dark theme colors
+    DARK = {
+        # Base colors
+        "bg_primary": "#111827",
+        "bg_secondary": "#1f2937",
+        "text_primary": "#f9fafb",
+        "text_secondary": "#d1d5db",
+        "border": "#374151",
+        "border_secondary": "#4b5563",
+        
+        # Brand colors
+        "brand_primary": "#3b82f6",
+        "brand_primary_dark": "#2563eb",
+        "brand_secondary": "#60a5fa",
+        "brand_gradient_from": "#3b82f6",
+        "brand_gradient_to": "#2563eb",
+        
+        # Status colors
+        "success": "#22c55e",
+        "success_light": "#064e3b",
+        "success_dark": "#16a34a",
+        "warning": "#eab308",
+        "warning_light": "#422006",
+        "warning_dark": "#ca8a04",
+        "danger": "#ef4444",
+        "danger_light": "#450a0a",
+        "danger_dark": "#dc2626",
+        "info": "#06b6d4",
+        "info_light": "#083344",
+        "info_dark": "#0891b2",
+        
+        # UI Element colors
+        "card_shadow": "rgba(0, 0, 0, 0.25)",
+        "header_pattern": "rgba(0, 0, 0, 0.2)",
+        "header_gradient_overlay": "rgba(0, 0, 0, 0.3)",
+        
+        # Chart colors - same as light theme for consistency
+        "chart_colors": [
+            "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+            "#06b6d4", "#f97316", "#84cc16", "#ec4899", "#6366f1"
+        ],
+        
+        # Component specific colors
+        "complexity_low": "bg-green-900 text-green-100",
+        "complexity_medium": "bg-yellow-900 text-yellow-100",
+        "complexity_high": "bg-orange-900 text-orange-100",
+        "complexity_very_high": "bg-red-900 text-red-100",
+    }
 
 
 class ReportComponent:
@@ -227,36 +331,36 @@ class ComplexFilesTableComponent(TableComponent):
 
             # Get complexity badge class based on score
             if file_metrics.complexity_score >= 30:
-                complexity_badge = "bg-red-100 text-red-800"
+                complexity_badge = ThemeColors.LIGHT["complexity_very_high"] + " dark:" + ThemeColors.DARK["complexity_very_high"]
             elif file_metrics.complexity_score >= 20:
-                complexity_badge = "bg-orange-100 text-orange-800"
+                complexity_badge = ThemeColors.LIGHT["complexity_high"] + " dark:" + ThemeColors.DARK["complexity_high"]
             elif file_metrics.complexity_score >= 10:
-                complexity_badge = "bg-yellow-100 text-yellow-800"
+                complexity_badge = ThemeColors.LIGHT["complexity_medium"] + " dark:" + ThemeColors.DARK["complexity_medium"]
             else:
-                complexity_badge = "bg-green-100 text-green-800"
+                complexity_badge = ThemeColors.LIGHT["complexity_low"] + " dark:" + ThemeColors.DARK["complexity_low"]
 
             # Format issues display
             if issues > 0:
-                issues_display = f'<span class="text-red-600 font-semibold">{issues}</span>'
+                issues_display = f'<span class="text-red-600 dark:text-red-400 font-semibold">{issues}</span>'
             else:
-                issues_display = '<span class="text-green-600">0</span>'
+                issues_display = '<span class="text-green-600 dark:text-green-400">0</span>'
 
             rows += f'''
-        <tr class="hover:bg-gray-50 hover:scale-[1.005] transition-all duration-200">
-            <td class="px-6 py-4 border-b border-gray-200">
-                <div class="flex items-center gap-2 font-mono text-sm text-gray-600 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap bg-gray-50 px-2 py-1 rounded border border-gray-200" title="{relative_path}">
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 hover:scale-[1.005] transition-all duration-200">
+            <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-2 font-mono text-sm text-gray-600 dark:text-gray-400 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-700" title="{relative_path}">
                     <i class="fas fa-file-code" aria-hidden="true"></i>
                     {relative_path}
                 </div>
             </td>
-            <td class="px-6 py-4 border-b border-gray-200"><span class="font-semibold text-gray-900 tabular-nums">{file_metrics.sloc:,}</span></td>
-            <td class="px-6 py-4 border-b border-gray-200"><span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide {complexity_badge}">{file_metrics.complexity_score:.0f}</span></td>
-            <td class="px-6 py-4 border-b border-gray-200">{issues_display}</td>
+            <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700"><span class="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">{file_metrics.sloc:,}</span></td>
+            <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700"><span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide {complexity_badge}">{file_metrics.complexity_score:.0f}</span></td>
+            <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">{issues_display}</td>
         </tr>'''
 
         return f'''
-        <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 h-full">
-            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+        <div class="bg-card p-6 rounded-2xl shadow-md border border-theme h-full">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-body">
                 <i class="fas fa-exclamation-triangle text-orange-500" aria-hidden="true"></i> 
                 Most Complex Files
             </h3>
@@ -264,10 +368,10 @@ class ComplexFilesTableComponent(TableComponent):
                 <table class="min-w-full">
                     <thead>
                         <tr>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">File</th>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">LOC</th>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Complexity</th>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Issues</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">File</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">LOC</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Complexity</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Issues</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -338,16 +442,16 @@ class DependenciesTableComponent(TableComponent):
         rows = ""
         for name, count in list(dependencies.items())[:15]:  # Limit to 15 items
             rows += f'''
-                <tr class="hover:bg-gray-50 hover:scale-[1.005] transition-all duration-200">
-                    <td class="px-6 py-4 border-b border-gray-200">
-                        <div class="flex items-center gap-2 font-mono text-sm text-gray-600 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 hover:scale-[1.005] transition-all duration-200">
+                    <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center gap-2 font-mono text-sm text-gray-600 dark:text-gray-400 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-700">
                             <i class="fas fa-cubes" aria-hidden="true"></i>
                             {name}
                         </div>
                     </td>
-                    <td class="px-6 py-4 border-b border-gray-200"><span class="font-semibold text-gray-900">{count}</span></td>
-                    <td class="px-6 py-4 border-b border-gray-200">
-                        <span class="text-gray-400">-</span>
+                    <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700"><span class="font-semibold text-gray-900 dark:text-gray-100">{count}</span></td>
+                    <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <span class="text-gray-400 dark:text-gray-500">-</span>
                     </td>
                 </tr>'''
         return rows
@@ -361,8 +465,8 @@ class DependenciesTableComponent(TableComponent):
         """
         return '''
             <tr>
-                <td class="px-6 py-4 border-b border-gray-200" colspan="3">
-                    <div class="text-center text-gray-500">No dependency information available</div>
+                <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700" colspan="3">
+                    <div class="text-center text-muted">No dependency information available</div>
                 </td>
             </tr>'''
 
@@ -375,8 +479,8 @@ class DependenciesTableComponent(TableComponent):
         """
         return '''
                 <tr>
-                    <td class="px-6 py-4 border-b border-gray-200" colspan="3">
-                        <div class="text-center text-gray-500">No dependency information available</div>
+                    <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700" colspan="3">
+                        <div class="text-center text-muted">No dependency information available</div>
                     </td>
                 </tr>'''
 
@@ -391,8 +495,8 @@ class DependenciesTableComponent(TableComponent):
             Complete HTML table with container
         """
         return f'''
-        <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 h-full">
-            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+        <div class="bg-card p-6 rounded-2xl shadow-md border border-theme h-full">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-body">
                 <i class="fas fa-cubes text-blue-500" aria-hidden="true"></i> 
                 Dependencies
             </h3>
@@ -400,9 +504,9 @@ class DependenciesTableComponent(TableComponent):
                 <table class="min-w-full">
                     <thead>
                         <tr>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Version</th>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">License</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Version</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">License</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -471,8 +575,8 @@ class PlotReportGenerator:
         icon = icon_map.get(chart_id, '<i class="fas fa-chart-pie text-blue-500" aria-hidden="true"></i>')
 
         return f'''
-        <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 h-full">
-            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+        <div class="bg-card p-6 rounded-2xl shadow-md border border-theme h-full">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-body">
                 {icon} {title}
             </h3>
             <div class="h-64 w-full">
@@ -491,9 +595,9 @@ class HeaderComponent(ReportComponent):
         return f'''
         <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-12 text-center mb-8 rounded-3xl shadow-2xl relative overflow-hidden">
             <div class="absolute inset-0 opacity-30">
-                <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 100 100%22%3E%3Cdefs%3E%3Cpattern id%3D%22grid%22 width%3D%2210%22 height%3D%2210%22 patternUnits%3D%22userSpaceOnUse%22%3E%3Cpath d%3D%22M 10 0 L 0 0 0 10%22 fill%3D%22none%22 stroke%3D%22rgba(255,255,255,0.1)%22 stroke-width%3D%220.5%22%2F%3E%3C%2Fpattern%3E%3C%2Fdefs%3E%3Crect width%3D%22100%22 height%3D%22100%22 fill%3D%22url(%23grid)%22%2F%3E%3C%2Fsvg%3E');"></div>
+                <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 100 100%22%3E%3Cdefs%3E%3Cpattern id%3D%22grid%22 width%3D%2210%22 height%3D%2210%22 patternUnits%3D%22userSpaceOnUse%22%3E%3Cpath d%3D%22M 10 0 L 0 0 0 10%22 fill%3D%22none%22 stroke%3D%22var(--header-pattern)%22 stroke-width%3D%220.5%22%2F%3E%3C%2Fpattern%3E%3C%2Fdefs%3E%3Crect width%3D%22100%22 height%3D%22100%22 fill%3D%22url(%23grid)%22%2F%3E%3C%2Fsvg%3E');"></div>
             </div>
-            <div class="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-gradient-radial from-white/10 to-transparent animate-float"></div>
+            <div class="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-gradient-radial animate-float"></div>
             <div class="relative z-10">
                 <h1 class="text-4xl lg:text-5xl font-bold mb-3 drop-shadow-sm flex items-center justify-center gap-4 flex-col sm:flex-row">
                     <i class="fas fa-chart-line" aria-hidden="true"></i> 
@@ -512,65 +616,65 @@ class MetricsGridComponent(ReportComponent):
         """Render the metrics grid HTML section"""
         return f'''
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10 fade-in">
-            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
                 <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-300 group-hover:h-1.5"></div>
                 <div class="flex items-center justify-between mb-5">
                     <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-file-code" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.total_files:,}</div>
-                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Files Analyzed</div>
+                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.total_files:,}</div>
+                <div class="text-muted font-medium uppercase text-xs tracking-wider">Files Analyzed</div>
             </div>
-            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
                 <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300 group-hover:h-1.5"></div>
                 <div class="flex items-center justify-between mb-5">
                     <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-code" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.total_loc:,}</div>
-                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Lines of Code</div>
+                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.total_loc:,}</div>
+                <div class="text-muted font-medium uppercase text-xs tracking-wider">Lines of Code</div>
             </div>
-            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
                 <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-500 to-yellow-400 transition-all duration-300 group-hover:h-1.5"></div>
                 <div class="flex items-center justify-between mb-5">
                     <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-cube" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.total_classes:,}</div>
-                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Classes</div>
+                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.total_classes:,}</div>
+                <div class="text-muted font-medium uppercase text-xs tracking-wider">Classes</div>
             </div>
-            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
                 <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-red-400 transition-all duration-300 group-hover:h-1.5"></div>
                 <div class="flex items-center justify-between mb-5">
                     <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-cogs" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.total_functions:,}</div>
-                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Functions</div>
+                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.total_functions:,}</div>
+                <div class="text-muted font-medium uppercase text-xs tracking-wider">Functions</div>
             </div>
-            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
                 <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-300 group-hover:h-1.5"></div>
                 <div class="flex items-center justify-between mb-5">
                     <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-star" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.code_quality_score:.1f}%</div>
-                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Code Quality</div>
+                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.code_quality_score:.1f}%</div>
+                <div class="text-muted font-medium uppercase text-xs tracking-wider">Code Quality</div>
             </div>
-            <div class="bg-white p-7 rounded-2xl shadow-md border border-gray-200 transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
+            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
                 <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-300 group-hover:h-1.5"></div>
                 <div class="flex items-center justify-between mb-5">
                     <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
                         <i class="fas fa-tools" aria-hidden="true"></i>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-gray-900 leading-none mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">{metrics.maintainability_score:.1f}%</div>
-                <div class="text-gray-600 font-medium uppercase text-xs tracking-wider">Maintainability</div>
+                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.maintainability_score:.1f}%</div>
+                <div class="text-muted font-medium uppercase text-xs tracking-wider">Maintainability</div>
             </div>
         </div>'''
 
@@ -582,12 +686,33 @@ class FooterComponent(ReportComponent):
     def render(metrics: 'ProjectMetrics') -> str:
         """Render the footer HTML section"""
         return '''
-        <div class="text-center py-8 text-gray-500 text-sm border-t border-gray-200 mt-10 bg-gradient-to-r from-gray-50 to-transparent rounded-xl fade-in">
+        <div class="text-center py-8 text-muted text-sm border-t border-theme mt-10 bg-gradient-to-r from-gray-50 dark:from-gray-900 to-transparent rounded-xl fade-in">
             <p class="mb-2">Report generated by Codebase Analysis Tool</p>
             <p class="flex items-center justify-center gap-2">
                 <i class="fas fa-clock" aria-hidden="true"></i> 
                 For best results, run analysis regularly to track code quality trends
             </p>
+        </div>'''
+
+
+class ThemeToggleComponent(ReportComponent):
+    """Theme toggle button component for HTML report"""
+    
+    @staticmethod
+    def render(metrics: 'ProjectMetrics') -> str:
+        """Render the theme toggle button HTML section"""
+        return '''
+        <div class="fixed top-4 right-4 z-50">
+            <button id="theme-toggle" class="p-3 rounded-full bg-white/80 dark:bg-gray-800/80 shadow-md hover:shadow-lg transition-all duration-300 backdrop-blur-md border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">
+                <!-- Sun icon (shown in dark mode) -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <!-- Moon icon (shown in light mode) -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
         </div>'''
 
 
@@ -606,6 +731,7 @@ class HTMLReportGenerator:
     def __init__(self) -> None:
         """Initialize the HTML report generator."""
         self._plot_generator = PlotReportGenerator()
+        self._default_theme = "light"
 
     def create(self, metrics: 'ProjectMetrics') -> str:
         """Generate HTML report for the given metrics.
@@ -638,7 +764,7 @@ class HTMLReportGenerator:
         """
         return f'''
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{self._default_theme}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -651,10 +777,45 @@ class HTMLReportGenerator:
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {{
-            --text-primary: #1f2937;
-            --text-secondary: #4b5563;
-            --tw-gradient-from: rgba(255, 255, 255, 0.1);
-            --tw-gradient-to: transparent;
+            color-scheme: light dark;
+            
+            /* Light theme variables */
+            --bg-primary: {ThemeColors.LIGHT["bg_primary"]};
+            --bg-secondary: {ThemeColors.LIGHT["bg_secondary"]};
+            --text-primary: {ThemeColors.LIGHT["text_primary"]};
+            --text-secondary: {ThemeColors.LIGHT["text_secondary"]};
+            --border-color: {ThemeColors.LIGHT["border"]};
+            --border-secondary: {ThemeColors.LIGHT["border_secondary"]};
+            
+            --brand-primary: {ThemeColors.LIGHT["brand_primary"]};
+            --brand-primary-dark: {ThemeColors.LIGHT["brand_primary_dark"]};
+            --brand-secondary: {ThemeColors.LIGHT["brand_secondary"]};
+            --brand-gradient-from: {ThemeColors.LIGHT["brand_gradient_from"]};
+            --brand-gradient-to: {ThemeColors.LIGHT["brand_gradient_to"]};
+            
+            --card-shadow: {ThemeColors.LIGHT["card_shadow"]};
+            --header-pattern: {ThemeColors.LIGHT["header_pattern"]};
+            --header-gradient-overlay: {ThemeColors.LIGHT["header_gradient_overlay"]};
+        }}
+        
+        .dark {{
+            /* Dark theme variables */
+            --bg-primary: {ThemeColors.DARK["bg_primary"]};
+            --bg-secondary: {ThemeColors.DARK["bg_secondary"]};
+            --text-primary: {ThemeColors.DARK["text_primary"]};
+            --text-secondary: {ThemeColors.DARK["text_secondary"]};
+            --border-color: {ThemeColors.DARK["border"]};
+            --border-secondary: {ThemeColors.DARK["border_secondary"]};
+            
+            --brand-primary: {ThemeColors.DARK["brand_primary"]};
+            --brand-primary-dark: {ThemeColors.DARK["brand_primary_dark"]};
+            --brand-secondary: {ThemeColors.DARK["brand_secondary"]};
+            --brand-gradient-from: {ThemeColors.DARK["brand_gradient_from"]};
+            --brand-gradient-to: {ThemeColors.DARK["brand_gradient_to"]};
+            
+            --card-shadow: {ThemeColors.DARK["card_shadow"]};
+            --header-pattern: {ThemeColors.DARK["header_pattern"]};
+            --header-gradient-overlay: {ThemeColors.DARK["header_gradient_overlay"]};
         }}
         
         * {{
@@ -667,7 +828,28 @@ class HTMLReportGenerator:
             font-family: 'Inter', sans-serif;
             line-height: 1.5;
             color: var(--text-primary);
-            background-color: #f9fafb;
+            background-color: var(--bg-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }}
+        
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {{
+            width: 12px;
+            height: 12px;
+        }}
+        
+        ::-webkit-scrollbar-track {{
+            background-color: var(--bg-primary);
+        }}
+        
+        ::-webkit-scrollbar-thumb {{
+            background-color: var(--brand-primary);
+            border-radius: 6px;
+            border: 3px solid var(--bg-primary);
+        }}
+        
+        ::-webkit-scrollbar-thumb:hover {{
+            background-color: var(--brand-primary-dark);
         }}
         
         .animate-float {{
@@ -689,7 +871,7 @@ class HTMLReportGenerator:
         }}
         
         .bg-gradient-radial {{
-            background: radial-gradient(circle, var(--tw-gradient-from) 0%, var(--tw-gradient-to) 100%);
+            background: radial-gradient(circle, var(--header-gradient-overlay) 0%, transparent 100%);
         }}
         
         .w-13 {{
@@ -699,9 +881,44 @@ class HTMLReportGenerator:
         .h-13 {{
             height: 3.25rem;
         }}
+        
+        /* Theme-aware Tailwind utilities */
+        .bg-card {{
+            background-color: var(--bg-secondary);
+            border-color: var(--border-color);
+            box-shadow: 0 4px 6px var(--card-shadow);
+        }}
+        
+        .text-body {{
+            color: var(--text-primary);
+        }}
+        
+        .text-muted {{
+            color: var(--text-secondary);
+        }}
+        
+        .border-theme {{
+            border-color: var(--border-color);
+        }}
     </style>
+    <script>
+        tailwind.config = {{
+            darkMode: 'class',
+            theme: {{
+                extend: {{
+                    colors: {{
+                        brand: {{
+                            primary: 'var(--brand-primary)',
+                            secondary: 'var(--brand-secondary)',
+                        }}
+                    }}
+                }}
+            }}
+        }}
+    </script>
 </head>
-<body class="font-inter bg-gray-50 text-gray-800 text-sm min-h-screen">
+<body class="font-inter text-sm min-h-screen">
+    {ThemeToggleComponent.render(metrics)}
     <div class="max-w-7xl mx-auto p-6">
         {HeaderComponent.render(metrics)}
         {MetricsGridComponent.render(metrics)}
@@ -715,6 +932,7 @@ class HTMLReportGenerator:
         {FooterComponent.render(metrics)}
     </div>
     {self._get_javascript()}
+    {self._get_theme_javascript()}
 </body>
 </html>'''
 
@@ -745,7 +963,8 @@ class HTMLReportGenerator:
                             font: {{
                                 family: "'Inter', sans-serif",
                                 size: 11
-                            }}
+                            }},
+                            color: 'var(--text-primary)'
                         }}
                     }},
                     tooltip: {{
@@ -776,7 +995,14 @@ class HTMLReportGenerator:
                             font: {{
                                 family: "'Inter', sans-serif",
                                 size: 12
-                            }}
+                            }},
+                            color: 'var(--text-primary)'
+                        }},
+                        ticks: {{
+                            color: 'var(--text-secondary)'
+                        }},
+                        grid: {{
+                            color: 'var(--border-color)'
                         }}
                     }},
                     x: {{
@@ -786,7 +1012,14 @@ class HTMLReportGenerator:
                             font: {{
                                 family: "'Inter', sans-serif",
                                 size: 12
-                            }}
+                            }},
+                            color: 'var(--text-primary)'
+                        }},
+                        ticks: {{
+                            color: 'var(--text-secondary)'
+                        }},
+                        grid: {{
+                            color: 'var(--border-color)'
                         }}
                     }}
                 }},
@@ -811,7 +1044,14 @@ class HTMLReportGenerator:
                             font: {{
                                 family: "'Inter', sans-serif",
                                 size: 12
-                            }}
+                            }},
+                            color: 'var(--text-primary)'
+                        }},
+                        ticks: {{
+                            color: 'var(--text-secondary)'
+                        }},
+                        grid: {{
+                            color: 'var(--border-color)'
                         }}
                     }},
                     x: {{
@@ -821,7 +1061,14 @@ class HTMLReportGenerator:
                             font: {{
                                 family: "'Inter', sans-serif",
                                 size: 12
-                            }}
+                            }},
+                            color: 'var(--text-primary)'
+                        }},
+                        ticks: {{
+                            color: 'var(--text-secondary)'
+                        }},
+                        grid: {{
+                            color: 'var(--border-color)'
                         }}
                     }}
                 }},
@@ -846,7 +1093,14 @@ class HTMLReportGenerator:
                             font: {{
                                 family: "'Inter', sans-serif",
                                 size: 12
-                            }}
+                            }},
+                            color: 'var(--text-primary)'
+                        }},
+                        ticks: {{
+                            color: 'var(--text-secondary)'
+                        }},
+                        grid: {{
+                            color: 'var(--border-color)'
                         }}
                     }},
                     x: {{
@@ -856,7 +1110,14 @@ class HTMLReportGenerator:
                             font: {{
                                 family: "'Inter', sans-serif",
                                 size: 12
-                            }}
+                            }},
+                            color: 'var(--text-primary)'
+                        }},
+                        ticks: {{
+                            color: 'var(--text-secondary)'
+                        }},
+                        grid: {{
+                            color: 'var(--border-color)'
                         }}
                     }}
                 }},
@@ -870,10 +1131,7 @@ class HTMLReportGenerator:
     }};
     
     // Default colors for charts
-    const defaultColors = [
-        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-        '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#6366f1'
-    ];
+    const defaultColors = {json.dumps(ThemeColors.LIGHT["chart_colors"])};
     
     // Set up charts after DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {{
@@ -891,7 +1149,7 @@ class HTMLReportGenerator:
             const bgColors = data.colors || defaultColors;
             
             // Create chart
-            new Chart(canvas, {{
+            const chart = new Chart(canvas, {{
                 type: chartType,
                 data: {{
                     labels: data.labels,
@@ -907,8 +1165,83 @@ class HTMLReportGenerator:
                 }},
                 options: chartOptions[dataKey]?.options || {{}}
             }});
+            
+            // Store chart instance for later theme updates
+            window.chartInstances = window.chartInstances || {{}};
+            window.chartInstances[dataKey] = chart;
         }});
     }});
+</script>'''
+
+    def _get_theme_javascript(self) -> str:
+        """Get the JavaScript for theme switching.
+        
+        Returns:
+            JavaScript code for theme switching
+        """
+        return '''
+<script>
+    // Theme switching functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+        
+        // Check for saved theme preference or use system preference
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        // Apply the saved theme or system preference
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+            html.classList.add('dark');
+        } else {
+            html.classList.remove('dark');
+        }
+        
+        // Handle theme toggle button click
+        themeToggle.addEventListener('click', function() {
+            // Toggle theme
+            html.classList.toggle('dark');
+            
+            // Save preference
+            localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+            
+            // Update charts with theme-aware colors if they exist
+            if (window.chartInstances) {
+                Object.values(window.chartInstances).forEach(chart => {
+                    // Update colors that should change with theme
+                    if (chart.options.scales) {
+                        if (chart.options.scales.y) {
+                            chart.options.scales.y.grid.color = 'var(--border-color)';
+                            chart.options.scales.y.ticks.color = 'var(--text-secondary)';
+                            chart.options.scales.y.title.color = 'var(--text-primary)';
+                        }
+                        if (chart.options.scales.x) {
+                            chart.options.scales.x.grid.color = 'var(--border-color)';
+                            chart.options.scales.x.ticks.color = 'var(--text-secondary)';
+                            chart.options.scales.x.title.color = 'var(--text-primary)';
+                        }
+                    }
+                    
+                    if (chart.options.plugins && chart.options.plugins.legend) {
+                        chart.options.plugins.legend.labels.color = 'var(--text-primary)';
+                    }
+                    
+                    chart.update();
+                });
+            }
+        });
+        
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (!localStorage.getItem('theme')) {  // Only if user hasn't set a preference
+                if (event.matches) {
+                    html.classList.add('dark');
+                } else {
+                    html.classList.remove('dark');
+                }
+            }
+        });
+    });
 </script>'''
 
 
