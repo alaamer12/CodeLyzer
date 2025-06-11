@@ -108,7 +108,9 @@ class AdvancedCodeAnalyzer:
 
             metrics, content = self._get_file_metrics_and_content(file_path, language, file_size)
 
-            if metrics and content:
+            # If an AST analyzer was used, it already ran all metric providers.
+            # Otherwise, run the remaining analyzers for non-AST (e.g., pattern-based) analysis.
+            if metrics and content and not self.language_analyzers.get(language):
                 self._apply_additional_analysis(file_path, content, metrics)
 
             return metrics

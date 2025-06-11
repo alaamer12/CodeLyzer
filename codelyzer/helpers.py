@@ -190,11 +190,20 @@ class Scoring:
         # Calculate code quality score (based on code smells and security issues)
         total_issues = sum(len(file_metrics.security_issues) + len(file_metrics.code_smells_list)
                            for file_metrics in metrics.file_metrics)
-        if total_issues > 0:
-            metrics.code_quality.code_quality_score = max(0, min(100,
-                                                                 int(100 - (total_issues / metrics.total_files * 10))))
+
+        if metrics.total_sloc > 0:
+            # Calculate an issue density score
+            issue_density = total_issues / metrics.total_sloc
+            # Normalize and scale to a 0-100 score. The scaling factor can be tuned.
+            # A lower factor means quality drops slower.
+            quality_score = 100 * (1 - min(1, issue_density * 5))
+            metrics.code_quality.code_quality_score = max(0.0, quality_score)
+        elif total_issues > 0:
+            # If no code, but issues found (e.g. in config files), penalize heavily
+            metrics.code_quality.code_quality_score = 0.0
         else:
-            metrics.code_quality.code_quality_score = 100
+            # No issues and no code
+            metrics.code_quality.code_quality_score = 100.0
 
         # Calculate maintainability score
         valid_files = [f for f in metrics.file_metrics if
