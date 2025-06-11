@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "codelyzer"
-version = "0.1.0"
+version = "0.1.0b7"
 description = "A powerful, extensible static code analysis tool with multi-language support"
 authors = ["Alaamer <ahmedmuhmmed239@gmail.com>"]
 readme = "README.md"
@@ -22,12 +22,12 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.9"
 rich = "^14.0.0"
-jinja2 = "^3.1.6"
 pandas = "^2.3.0"
+typer = "^0.16.0"
 
 
 [tool.poetry.scripts]
-codelyzer = "codelyzer.cli:main"
+lyz = "codelyzer.cli:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
