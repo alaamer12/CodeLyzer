@@ -319,10 +319,11 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
         class_count = 0
         function_count = 0
         method_count = 0
+        imports_list = []
 
         # Process the AST
         def process_node(node):
-            nonlocal class_count, function_count, method_count
+            nonlocal class_count, function_count, method_count, imports_list
 
             if node.type == "class_definition":
                 class_count += 1
@@ -340,6 +341,8 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
                     method_count += 1
                 else:
                     function_count += 1
+            elif node.type in ["import_statement", "import_from_statement"]:
+                imports_list.append(node.text.decode('utf8').split('\n')[0])
 
             # Process children
             for child in node.children:
@@ -352,6 +355,7 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
         metrics.structure.classes = class_count
         metrics.structure.functions = function_count
         metrics.structure.methods = method_count
+        metrics.structure.imports = imports_list
 
         # Calculate cyclomatic complexity - count branches
         complexity = self._calculate_cyclomatic_complexity(root_node)
@@ -422,11 +426,11 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
         # Initialize counters
         class_count = 0
         function_count = 0
-        import_count = 0
+        imports_list = []
 
         # Process the AST
         def process_node(node):
-            nonlocal class_count, function_count, import_count
+            nonlocal class_count, function_count, imports_list
 
             if node.type == "class_declaration":
                 class_count += 1
@@ -434,7 +438,7 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
                                "generator_function_declaration", "function"]:
                 function_count += 1
             elif node.type in ["import_statement", "import_declaration"]:
-                import_count += 1
+                imports_list.append(node.text.decode('utf8').split('\n')[0])
 
             # Process children
             for child in node.children:
@@ -446,6 +450,7 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
         # Update metrics
         metrics.structure.classes = class_count
         metrics.structure.functions = function_count
+        metrics.structure.imports = imports_list
 
         # Calculate cyclomatic complexity
         complexity = self._calculate_cyclomatic_complexity(root_node)

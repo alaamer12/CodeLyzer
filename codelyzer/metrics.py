@@ -307,7 +307,7 @@ class ProjectSecurityMetrics:
 @dataclass
 class ProjectCodeQualityMetrics:
     """Project code quality metrics"""
-    code_quality_score: float = 0.0
+    code_quality_score: float = 100.0
     duplicate_blocks: List[Dict] = field(default_factory=list)
     duplicated_lines_ratio: float = 0.0
     largest_files: List[str] = field(default_factory=list)
