@@ -7,6 +7,7 @@ __version__ = "0.1.0"
 
 try:
     from codelyzer.ast_analyzers import initialize_analyzers
+
     # Initialize tree-sitter parsers if available
     initialize_analyzers()
 except ImportError:

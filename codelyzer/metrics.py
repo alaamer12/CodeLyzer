@@ -1,12 +1,14 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from typing import Dict, List, Any, Optional
-from abc import ABC, abstractmethod
+
 
 # =========== Base Enums ===========
 class MetricLevel(StrEnum):
     """Base enum for all metric levels"""
     UNDEFINED = auto()
+
 
 @dataclass
 class BaseMetric:
@@ -14,8 +16,6 @@ class BaseMetric:
     name: str
     value: Any = None
     level: Optional[MetricLevel] = None
-
-
 
 
 class ComplexityLevel(MetricLevel):
@@ -44,21 +44,20 @@ class CodeSmellSeverity(MetricLevel):
 
 class MaintainabilityLevel(MetricLevel):
     EXCELLENT = 'excellent'  # 85-100
-    GOOD = 'good'           # 65-84
-    MODERATE = 'moderate'   # 40-64
-    POOR = 'poor'           # 25-39
+    GOOD = 'good'  # 65-84
+    MODERATE = 'moderate'  # 40-64
+    POOR = 'poor'  # 25-39
     UNMAINTAINABLE = 'unmaintainable'  # 0-24
-
 
 
 @dataclass
 class FileMetricCategory:
     """Base class for a category of file metrics"""
     metrics: Dict[str, BaseMetric] = field(default_factory=dict)
-    
+
     def add_metric(self, name: str, value: Any, level: Optional[MetricLevel] = None) -> None:
         self.metrics[name] = BaseMetric(name=name, value=value, level=level)
-    
+
     def get_metric(self, name: str) -> Optional[BaseMetric]:
         return self.metrics.get(name)
 
@@ -84,7 +83,7 @@ class ComplexityMetrics(FileMetricCategory):
     halstead_complexity: float = 0.0
     complexity_score: float = 0.0
     maintainability_index: float = 0.0
-    
+
     def determine_complexity_level(self) -> ComplexityLevel:
         """Determine complexity level based on metrics"""
         if self.complexity_score < 50:
@@ -106,15 +105,15 @@ class SecurityMetrics(FileMetricCategory):
     """Security-related metrics"""
     vulnerabilities: List[Dict] = field(default_factory=list)
     security_score: float = 100.0
-    
+
     def determine_security_level(self) -> SecurityLevel:
         """Determine security level based on metrics"""
         if not self.vulnerabilities:
             return SecurityLevel.SECURE
-        
+
         critical_count = sum(1 for v in self.vulnerabilities if v.get('severity') == 'critical')
         high_count = sum(1 for v in self.vulnerabilities if v.get('severity') == 'high')
-        
+
         if critical_count > 0:
             return SecurityLevel.CRITICAL
         elif high_count > 0:
@@ -131,12 +130,12 @@ class CodeSmellMetrics(FileMetricCategory):
     smells: List[Dict] = field(default_factory=list)
     duplicated_lines: int = 0
     technical_debt_ratio: float = 0.0
-    
+
     def determine_smell_severity(self) -> CodeSmellSeverity:
         """Determine code smell severity based on metrics"""
         critical_count = sum(1 for s in self.smells if s.get('severity') == 'critical')
         major_count = sum(1 for s in self.smells if s.get('severity') == 'major')
-        
+
         if critical_count > 0:
             return CodeSmellSeverity.CRITICAL
         elif major_count > 0:
@@ -162,7 +161,7 @@ class StructureMetrics(FileMetricCategory):
 class PatternMetrics(FileMetricCategory):
     """Pattern-based metrics"""
     patterns_found: Dict[str, List[Dict]] = field(default_factory=dict)
-    
+
     def add_pattern(self, pattern_name: str, location: Dict) -> None:
         if pattern_name not in self.patterns_found:
             self.patterns_found[pattern_name] = []
@@ -179,79 +178,79 @@ class FileMetrics:
     code_smells: CodeSmellMetrics = field(default_factory=CodeSmellMetrics)
     patterns: PatternMetrics = field(default_factory=PatternMetrics)
     custom_metrics: Dict[str, FileMetricCategory] = field(default_factory=dict)
-    
+
     @property
     def file_path(self) -> str:
         return self.base.file_path
-    
+
     @property
     def language(self) -> str:
         return self.base.language
-    
+
     @property
     def loc(self) -> int:
         return self.base.loc
-    
+
     @property
     def sloc(self) -> int:
         return self.base.sloc
-        
+
     @property
     def comments(self) -> int:
         return self.base.comments
-        
+
     @property
     def blanks(self) -> int:
         return self.base.blanks
-        
+
     @property
     def file_size(self) -> int:
         return self.base.file_size
-    
+
     @property
     def complexity_score(self) -> float:
         return self.complexity.complexity_score
-    
+
     @property
     def cyclomatic_complexity(self) -> int:
         return self.complexity.cyclomatic_complexity
-        
+
     @property
     def maintainability_index(self) -> float:
         return self.complexity.maintainability_index
-    
+
     @property
     def technical_debt_ratio(self) -> float:
         return self.code_smells.technical_debt_ratio
-    
+
     @property
     def duplicated_lines(self) -> int:
         return self.code_smells.duplicated_lines
-        
+
     @property
     def security_issues(self) -> List[Dict]:
         return self.security.vulnerabilities
-    
+
     @property
     def code_smells_list(self) -> List[Dict]:
         return self.code_smells.smells
-    
+
     @property
     def classes(self) -> int:
         return self.structure.classes
-    
+
     @property
     def functions(self) -> int:
         return self.structure.functions
-    
+
     @property
     def methods(self) -> int:
         return self.structure.methods
-    
+
     @property
     def imports(self) -> List[str]:
         return self.structure.imports
-    
+
     @property
     def methods_per_class(self) -> Dict[str, int]:
         return self.structure.methods_per_class
@@ -259,7 +258,7 @@ class FileMetrics:
     def add_custom_metric_category(self, name: str, category: FileMetricCategory) -> None:
         """Add a custom metric category"""
         self.custom_metrics[name] = category
-        
+
     def get_custom_metric_category(self, name: str) -> Optional[FileMetricCategory]:
         """Get a custom metric category"""
         return self.custom_metrics.get(name)
@@ -328,71 +327,71 @@ class ProjectMetrics:
     file_metrics: List[FileMetrics] = field(default_factory=list)
     custom_metrics: Dict[str, Any] = field(default_factory=dict)
     git_stats: Dict = field(default_factory=dict)
-    
+
     @property
     def total_files(self) -> int:
         return self.base.total_files
-        
+
     @property
     def total_loc(self) -> int:
         return self.base.total_loc
-        
+
     @property
     def total_sloc(self) -> int:
         return self.base.total_sloc
-        
+
     @property
     def total_comments(self) -> int:
         return self.base.total_comments
-        
+
     @property
     def total_blanks(self) -> int:
         return self.base.total_blanks
-        
+
     @property
     def total_classes(self) -> int:
         return self.structure.total_classes
-        
+
     @property
     def total_functions(self) -> int:
         return self.structure.total_functions
-        
+
     @property
     def total_methods(self) -> int:
         return self.structure.total_methods
-        
+
     @property
     def languages(self) -> Dict[str, int]:
         return self.base.languages
-        
+
     @property
     def project_size(self) -> int:
         return self.base.project_size
-        
+
     @property
     def analysis_duration(self) -> float:
         return self.base.analysis_duration
-    
+
     @property
     def complexity_distribution(self) -> Dict[ComplexityLevel, int]:
         return self.complexity.complexity_distribution
-    
+
     @property
     def most_complex_files(self) -> List[str]:
         return self.complexity.most_complex_files
-    
+
     @property
     def code_quality_score(self) -> float:
         return self.code_quality.code_quality_score
-        
+
     @property
     def maintainability_score(self) -> float:
         return self.complexity.maintainability_score
-    
+
     def add_custom_metric(self, name: str, value: Any) -> None:
         """Add a custom metric"""
         self.custom_metrics[name] = value
-        
+
     def get_custom_metric(self, name: str) -> Optional[Any]:
         """Get a custom metric"""
         return self.custom_metrics.get(name)
@@ -400,12 +399,12 @@ class ProjectMetrics:
 
 class MetricProvider(ABC):
     """Interface for classes that provide metrics"""
-    
+
     @abstractmethod
     def provide_file_metrics(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Provide metrics for a file"""
         pass
-    
+
     @abstractmethod
     def provide_project_metrics(self, project_metrics: ProjectMetrics) -> None:
         """Provide metrics for a project"""

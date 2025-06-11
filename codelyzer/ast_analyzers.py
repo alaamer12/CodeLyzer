@@ -1,18 +1,12 @@
+import concurrent.futures
 import os
 from abc import ABC, abstractmethod
 from typing import Dict, List, Type, Optional, ClassVar, Any
-import concurrent.futures
-
-try:
-    import tree_sitter
-    from tree_sitter import Language, Parser
-except ImportError:
-    print("Warning: tree-sitter not installed. Run: pip install tree-sitter")
+from tree_sitter import Language, Parser
 
 from codelyzer.config import FILE_SIZE_LIMIT, PARSE_TIMEOUT, GRAMMAR_PATH
-from codelyzer.core import MetricProvider
 from codelyzer.console import console
-from codelyzer.metrics import FileMetrics, BaseFileMetrics
+from codelyzer.metrics import FileMetrics, BaseFileMetrics, MetricProvider
 
 
 class ASTAnalyzer(ABC):
@@ -23,7 +17,7 @@ class ASTAnalyzer(ABC):
 
     # Class attribute for extensions supported by this analyzer
     extensions: ClassVar[List[str]] = []
-    
+
     # Class attribute for metric providers
     metric_providers: ClassVar[List[MetricProvider]] = []
 
@@ -37,7 +31,7 @@ class ASTAnalyzer(ABC):
     def get_analyzer_for_extension(cls, extension: str) -> Optional[Type['ASTAnalyzer']]:
         """Factory method to get the appropriate analyzer for a file extension"""
         return cls.ANALYZERS.get(extension.lower())
-    
+
     @classmethod
     def register_metric_provider(cls, provider: MetricProvider) -> None:
         """Register a metric provider for all analyzers"""
@@ -70,11 +64,11 @@ class ASTAnalyzer(ABC):
             try:
                 # Calculate core metrics first
                 self._calculate_metrics(ast_data, metrics, content)
-                
+
                 # Run all registered metric providers
                 for provider in self.metric_providers:
                     provider.provide_file_metrics(metrics, content, ast_data)
-                
+
             except Exception as e:
                 self._handle_metrics_calculation_error(metrics, content, e)
 
@@ -87,12 +81,13 @@ class ASTAnalyzer(ABC):
         except Exception as e:
             # Return minimal metrics object rather than None
             return self._handle_analysis_error(file_path, e)
-    
-    def _is_file_too_large(self, file_path: str) -> bool:
+
+    @staticmethod
+    def _is_file_too_large(file_path: str) -> bool:
         """Check if file exceeds the size limit"""
         file_size = os.path.getsize(file_path)
         return file_size > FILE_SIZE_LIMIT
-    
+
     def _create_metrics_for_large_file(self, file_path: str) -> FileMetrics:
         """Create metrics for files that are too large to process normally"""
         metrics = self._create_metrics_for_file(file_path)
@@ -100,34 +95,36 @@ class ASTAnalyzer(ABC):
         metrics.base.loc = metrics.base.sloc = file_size // 100  # Rough estimate
         metrics.base.file_size = file_size
         return metrics
-    
-    def _read_file_content(self, file_path: str) -> Optional[str]:
+
+    @staticmethod
+    def _read_file_content(file_path: str) -> Optional[str]:
         """Read file content with error handling"""
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 return f.read()
         except Exception:
             return None
-    
+
     def _create_empty_metrics(self, file_path: str) -> FileMetrics:
         """Create metrics for files that couldn't be read"""
         metrics = self._create_metrics_for_file(file_path)
         metrics.base.loc = metrics.base.sloc = 0
         return metrics
-    
+
     def _create_metrics_from_content(self, file_path: str, content: str) -> FileMetrics:
         """Create metrics based on content when AST parsing fails"""
         metrics = self._create_metrics_for_file(file_path)
         lines = content.count('\n') + 1
         metrics.base.loc = metrics.base.sloc = lines
         return metrics
-    
-    def _handle_metrics_calculation_error(self, metrics: FileMetrics, content: str, error: Exception) -> None:
+
+    @staticmethod
+    def _handle_metrics_calculation_error(metrics: FileMetrics, content: str, error: Exception) -> None:
         """Handle errors during metrics calculation"""
         lines = content.count('\n') + 1
         metrics.base.loc = metrics.base.sloc = lines
         console.print(f"[yellow]Warning: Error calculating metrics: {str(error)}[/yellow]")
-    
+
     def _handle_analysis_error(self, file_path: str, error: Exception) -> FileMetrics:
         """Handle general errors during file analysis"""
         console.print(f"[yellow]Warning: Error analyzing {file_path}: {str(error)}[/yellow]")
@@ -155,7 +152,7 @@ class ASTAnalyzer(ABC):
         language = self._detect_language(file_path)
         file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
         last_modified = os.path.getmtime(file_path) if os.path.exists(file_path) else 0
-        
+
         base_metrics = BaseFileMetrics(
             file_path=file_path,
             language=language,
@@ -193,44 +190,44 @@ class ASTAnalyzer(ABC):
         pass
 
 
-class TreeSitterASTAnalyzer(ASTAnalyzer):
+class TreeSitterASTAnalyzer(ASTAnalyzer, ABC):
     """Base class for analyzers that use tree-sitter"""
-    
+
     # Will be set by subclasses
     language_parser: Optional[Parser] = None
     language_name: str = ""
     grammar_file: str = ""
-    
+
     # Comment node types specific to the language
     comment_types: List[str] = []
-    
+
     @classmethod
     def initialize_parser(cls):
         """Initialize the tree-sitter parser for this language"""
         if cls.language_parser is not None:
             return  # Already initialized
-            
+
         try:
             grammar_path = os.path.join(GRAMMAR_PATH, cls.grammar_file)
             if not os.path.exists(grammar_path):
                 console.print(f"[red]Error: Grammar file not found: {grammar_path}[/red]")
                 return
-                
+
             language = Language(grammar_path, cls.language_name)
             parser = Parser()
-            parser.set_language(language)
+            parser.language = language
             cls.language_parser = parser
         except Exception as e:
             console.print(f"[red]Error initializing {cls.language_name} parser: {str(e)}[/red]")
             cls.language_parser = None
-    
+
     def _parse_with_timeout(self, content: str, file_path: str) -> Any:
         """Parse the file content into an AST with timeout handling"""
         if self.language_parser is None:
             self.__class__.initialize_parser()
             if self.language_parser is None:
                 return Exception(f"Parser for {self.language_name} could not be initialized")
-        
+
         # Define a function to do the parsing
         def parse_content():
             try:
@@ -238,7 +235,7 @@ class TreeSitterASTAnalyzer(ASTAnalyzer):
                 return tree
             except Exception as e:
                 return e
-        
+
         # Execute with timeout
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(parse_content)
@@ -247,7 +244,7 @@ class TreeSitterASTAnalyzer(ASTAnalyzer):
             except (concurrent.futures.TimeoutError, Exception) as e:
                 console.print(f"[yellow]Warning: Parsing {file_path} timed out or failed[/yellow]")
                 return e
-    
+
     def _count_comment_lines(self, content: str) -> int:
         """Count comment lines using tree-sitter"""
         try:
@@ -255,25 +252,25 @@ class TreeSitterASTAnalyzer(ASTAnalyzer):
                 self.__class__.initialize_parser()
                 if self.language_parser is None:
                     return 0
-                    
+
             tree = self.language_parser.parse(bytes(content, 'utf8'))
             root_node = tree.root_node
-            
+
             comment_lines = set()
-            
+
             def process_node(node):
                 if node.type in self.comment_types:
                     start_line = node.start_point[0]
                     end_line = node.end_point[0]
                     for line in range(start_line, end_line + 1):
                         comment_lines.add(line)
-                
+
                 for child in node.children:
                     process_node(child)
-            
+
             process_node(root_node)
             return len(comment_lines)
-            
+
         except Exception as e:
             console.print(f"[yellow]Warning: Error counting comment lines: {str(e)}[/yellow]")
             return 0
@@ -300,19 +297,19 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
         """Calculate Python-specific metrics from the tree-sitter AST"""
         if ast_data is None or isinstance(ast_data, Exception):
             return
-        
+
         root_node = ast_data.root_node
-        
+
         # Initialize counters
         class_count = 0
         function_count = 0
         method_count = 0
         import_count = 0
-        
+
         # Process the AST
         def process_node(node):
             nonlocal class_count, function_count, method_count, import_count
-            
+
             if node.type == "class_definition":
                 class_count += 1
             elif node.type == "function_definition":
@@ -324,35 +321,35 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
                         is_method = True
                         break
                     parent = parent.parent
-                
+
                 if is_method:
                     method_count += 1
                 else:
                     function_count += 1
             elif node.type in ["import_statement", "import_from_statement"]:
                 import_count += 1
-            
+
             # Process children
             for child in node.children:
                 process_node(child)
-        
+
         # Start processing from root
         process_node(root_node)
-        
+
         # Update metrics
         metrics.base.classes = class_count
         metrics.base.functions = function_count + method_count
         metrics.base.imports = import_count
-        
+
         # Calculate cyclomatic complexity - count branches
         complexity = self._calculate_cyclomatic_complexity(root_node)
         metrics.base.complexity_score = complexity
 
-
-    def _calculate_cyclomatic_complexity(self, root_node: Any) -> int:
+    @staticmethod
+    def _calculate_cyclomatic_complexity(root_node: Any) -> int:
         """Calculate cyclomatic complexity for Python code"""
         complexity = 1  # Start with 1
-        
+
         # Branch keywords and operators
         branch_types = [
             "if_statement", "elif_clause", "else_clause",
@@ -360,16 +357,16 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
             "try_statement", "except_clause", "finally_clause",
             "and", "or", "conditional_expression"
         ]
-        
+
         def traverse(node):
             nonlocal complexity
-            
+
             if node.type in branch_types:
                 complexity += 1
-            
+
             for child in node.children:
                 traverse(child)
-        
+
         traverse(root_node)
         return complexity
 
@@ -402,51 +399,52 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
         elif ext == '.tsx':
             return "tsx"
         return "javascript"
-        
+
     def _calculate_metrics(self, ast_data: Any, metrics: FileMetrics, content: str = None) -> None:
         """Calculate JavaScript-specific metrics from the tree-sitter AST"""
         if ast_data is None or isinstance(ast_data, Exception):
             return
-        
+
         root_node = ast_data.root_node
-        
+
         # Initialize counters
         class_count = 0
         function_count = 0
         import_count = 0
-        
+
         # Process the AST
         def process_node(node):
             nonlocal class_count, function_count, import_count
-            
+
             if node.type == "class_declaration":
                 class_count += 1
-            elif node.type in ["function_declaration", "arrow_function", "method_definition", 
+            elif node.type in ["function_declaration", "arrow_function", "method_definition",
                                "generator_function_declaration", "function"]:
                 function_count += 1
             elif node.type in ["import_statement", "import_declaration"]:
                 import_count += 1
-            
+
             # Process children
             for child in node.children:
                 process_node(child)
-        
+
         # Start processing from root
         process_node(root_node)
-        
+
         # Update metrics
         metrics.base.classes = class_count
         metrics.base.functions = function_count
         metrics.base.imports = import_count
-        
+
         # Calculate cyclomatic complexity
         complexity = self._calculate_cyclomatic_complexity(root_node)
         metrics.base.complexity_score = complexity
 
-    def _calculate_cyclomatic_complexity(self, root_node: Any) -> int:
+    @staticmethod
+    def _calculate_cyclomatic_complexity(root_node: Any) -> int:
         """Calculate cyclomatic complexity for JavaScript/TypeScript code"""
         complexity = 1  # Start with 1
-        
+
         # Branch keywords and operators
         branch_types = [
             "if_statement", "else_clause",
@@ -456,16 +454,16 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
             "case_statement", "switch_statement",
             "&&", "||", "?", "ternary_expression"
         ]
-        
+
         def traverse(node):
             nonlocal complexity
-            
+
             if node.type in branch_types:
                 complexity += 1
-            
+
             for child in node.children:
                 traverse(child)
-        
+
         traverse(root_node)
         return complexity
 
@@ -476,6 +474,7 @@ def initialize_analyzers():
     PythonASTAnalyzer.initialize_parser()
     JavaScriptASTAnalyzer.initialize_parser()
     console.print("[green]Initialized tree-sitter parsers for: Python, JavaScript[/green]")
+
 
 if __name__ == "__main__":
     analyzer = JavaScriptASTAnalyzer()
