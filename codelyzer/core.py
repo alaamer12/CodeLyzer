@@ -4,10 +4,12 @@ Enhanced Codebase Analyzer
 A powerful, robust tool for analyzing code repositories with beautiful terminal output.
 Supports multiple programming languages with detailed metrics and visualizations.
 """
+from __future__ import annotations
+
 import json
 import os
 import time
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Set, Optional
 
 import pandas as pd
 
@@ -17,7 +19,7 @@ from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptAS
 from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, TIMEOUT_SECONDS
 from codelyzer.console import console, create_analysis_progress_bar
 from codelyzer.helpers import StandardFileDiscovery, ProjectMetricsProcessor, Scoring
-from codelyzer.metrics import FileMetrics, ProjectMetrics
+from codelyzer.metrics import FileMetrics, ProjectMetrics, create_file_metrics
 from codelyzer.utils import FunctionWithTimeout
 
 
@@ -87,8 +89,8 @@ class AdvancedCodeAnalyzer:
         self.file_discovery = StandardFileDiscovery(self.exclude_dirs, LANGUAGE_CONFIGS)
         self.security_analyzer = SecurityAnalyzer()
         self.code_smell_analyzer = CodeSmellAnalyzer()
-        self.complexity_analyzer = ComplexityAnalyzer(LANGUAGE_CONFIGS)
-        self.pattern_analyzer = PatternBasedAnalyzer(LANGUAGE_CONFIGS)
+        self.complexity_analyzer = ComplexityAnalyzer()
+        self.pattern_analyzer = PatternBasedAnalyzer()
         self.metrics_processor = ProjectMetricsProcessor()
         self.scoring = Scoring()
 
@@ -131,7 +133,7 @@ class AdvancedCodeAnalyzer:
         if analyzer:
             metrics = analyzer.analyze_file(file_path)
             if metrics:
-                metrics.file_size = file_size
+                metrics.base.file_size = file_size
                 content = read_content(file_path)
         else:
             # Fall back to pattern-based analysis
@@ -143,22 +145,23 @@ class AdvancedCodeAnalyzer:
                 content = None
 
             if metrics:
-                metrics.file_size = file_size
+                metrics.base.file_size = file_size
 
         return metrics, content
 
     def _apply_additional_analysis(self, file_path: str, content: str, metrics: FileMetrics) -> None:
         """Apply additional analyzers to the file content"""
-        self.security_analyzer.analyze(file_path, content, metrics)
-        self.code_smell_analyzer.analyze(file_path, content, metrics)
-        self.complexity_analyzer.analyze(file_path, content, metrics)
+        self.security_analyzer.analyze_file(metrics, content, None)
+        self.code_smell_analyzer.analyze_file(metrics, content, None)
+        self.complexity_analyzer.analyze_file(metrics, content, None)
 
     def _create_fallback_metrics(self, file_path: str, error: Exception) -> FileMetrics:
         """Create minimal metrics when analysis fails"""
         console.print(f"[yellow]Warning: Error analyzing {file_path}: {str(error)}[/yellow]")
         language = self.file_discovery.detect_language(file_path) or "unknown"
-        metrics = FileMetrics(file_path=file_path, language=language)
-        metrics.loc = metrics.sloc = 0
+        metrics = create_file_metrics(file_path, language)
+        metrics.base.loc = 0
+        metrics.base.sloc = 0
         return metrics
 
     def analyze_project(self, project_path: str) -> ProjectMetrics:
@@ -252,7 +255,7 @@ class AdvancedCodeAnalyzer:
         # Dependencies
         if metrics.imports:
             for imp in metrics.imports:
-                project_metrics.dependencies[imp] = project_metrics.dependencies.get(imp, 0) + 1
+                project_metrics.structure.dependencies[imp] = project_metrics.structure.dependencies.get(imp, 0) + 1
 
     @staticmethod
     def _show_progress_stats(current: int, total: int, start_time: float, language_stats: Dict) -> None:
@@ -303,7 +306,7 @@ class ReportExport:
             },
             'languages': dict(self.metrics.languages),
             'complexity_distribution': dict(self.metrics.complexity_distribution),
-            'dependencies': dict(self.metrics.dependencies),
+            'dependencies': dict(self.metrics.structure.dependencies),
             'files': []
         }
 

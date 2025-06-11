@@ -370,6 +370,10 @@ class ProjectMetrics:
     def analysis_duration(self) -> float:
         return self.base.analysis_duration
 
+    @analysis_duration.setter
+    def analysis_duration(self, value: float):
+        self.base.analysis_duration = value
+
     @property
     def complexity_distribution(self) -> Dict[ComplexityLevel, int]:
         return self.complexity.complexity_distribution

@@ -14,8 +14,38 @@ class PatternBasedAnalyzer(MetricProvider):
             "jsx": self._get_js_patterns()
         }
 
-    def analyze_file(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
-        """Analyze file for design patterns and anti-patterns"""
+    def analyze_file(self, file_path_or_metrics: str | FileMetrics, file_content: str = None, ast_data: Any = None) -> None | FileMetrics:
+        """
+        Analyze file for design patterns and anti-patterns.
+        Can be called in two ways:
+        1. analyze_file(file_metrics, file_content, ast_data) - The MetricProvider interface method
+        2. analyze_file(file_path, language) - The method used directly by core.py
+        """
+        # Handle the direct file path case (from core.py)
+        if isinstance(file_path_or_metrics, str):
+            from pathlib import Path
+            from codelyzer.metrics import create_file_metrics
+            
+            file_path = file_path_or_metrics
+            language = ast_data  # In this case, ast_data is actually the language parameter
+            
+            # Create metrics object
+            metrics = create_file_metrics(file_path, language)
+            
+            # Read content
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+            except Exception:
+                return metrics
+                
+            # Analyze content
+            self.analyze_file(metrics, content, None)
+            
+            return metrics
+        
+        # Handle the standard MetricProvider interface case
+        file_metrics = file_path_or_metrics
         language = file_metrics.language
 
         # Skip if content is empty

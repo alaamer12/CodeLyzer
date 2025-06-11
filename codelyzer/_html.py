@@ -53,7 +53,7 @@ class LanguageChartData(ChartData):
     """Language distribution chart data"""
 
     @staticmethod
-    def prepare_data(metrics: 'ProjectMetrics') -> Dict[str, Any]:
+    def prepare_data(metrics: 'ProjectMetrics', *args, **kwargs) -> Dict[str, Any]:
         """Prepare language distribution data
         
         Args:

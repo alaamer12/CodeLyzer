@@ -168,7 +168,7 @@ def create_dependencies_table(metrics: ProjectMetrics) -> Table:
     table.add_column("Usage Count", justify="right", style="magenta")
 
     # Get top 15 dependencies
-    top_deps = sorted(metrics.dependencies.items(), key=lambda x: x[1], reverse=True)[:15]
+    top_deps = sorted(metrics.structure.dependencies.items(), key=lambda x: x[1], reverse=True)[:15]
 
     for module, count in top_deps:
         table.add_row(module, str(count))
