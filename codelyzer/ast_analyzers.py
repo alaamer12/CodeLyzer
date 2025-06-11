@@ -319,11 +319,10 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
         class_count = 0
         function_count = 0
         method_count = 0
-        import_count = 0
 
         # Process the AST
         def process_node(node):
-            nonlocal class_count, function_count, method_count, import_count
+            nonlocal class_count, function_count, method_count
 
             if node.type == "class_definition":
                 class_count += 1
@@ -341,8 +340,6 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
                     method_count += 1
                 else:
                     function_count += 1
-            elif node.type in ["import_statement", "import_from_statement"]:
-                import_count += 1
 
             # Process children
             for child in node.children:
@@ -352,13 +349,14 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
         process_node(root_node)
 
         # Update metrics
-        metrics.base.classes = class_count
-        metrics.base.functions = function_count + method_count
-        metrics.base.imports = import_count
+        metrics.structure.classes = class_count
+        metrics.structure.functions = function_count
+        metrics.structure.methods = method_count
 
         # Calculate cyclomatic complexity - count branches
         complexity = self._calculate_cyclomatic_complexity(root_node)
-        metrics.base.complexity_score = complexity
+        metrics.complexity.cyclomatic_complexity = complexity
+        metrics.complexity.complexity_score = float(complexity)
 
     @staticmethod
     def _calculate_cyclomatic_complexity(root_node: Any) -> int:
@@ -446,13 +444,13 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
         process_node(root_node)
 
         # Update metrics
-        metrics.base.classes = class_count
-        metrics.base.functions = function_count
-        metrics.base.imports = import_count
+        metrics.structure.classes = class_count
+        metrics.structure.functions = function_count
 
         # Calculate cyclomatic complexity
         complexity = self._calculate_cyclomatic_complexity(root_node)
-        metrics.base.complexity_score = complexity
+        metrics.complexity.cyclomatic_complexity = complexity
+        metrics.complexity.complexity_score = float(complexity)
 
     @staticmethod
     def _calculate_cyclomatic_complexity(root_node: Any) -> int:
