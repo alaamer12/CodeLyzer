@@ -4,7 +4,7 @@ import os
 
 def run_analysis():
     command = [
-        "python", "cli.py", "analyze", 
+        "python", "codelyzer/cli.py", "analyze", 
         r"E:\Projects\Languages\Websites\Vanila\Done\2048",
         "--format", "html"
     ]
