@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, TypeVar
 
-from codelyzer.config import ProjectMetrics, SecurityLevel, CodeSmellSeverity
+from codelyzer.metrics import ProjectMetrics, SecurityLevel, CodeSmellSeverity
 
 T = TypeVar('T', bound='ChartData')
 

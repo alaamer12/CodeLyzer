@@ -12,7 +12,8 @@ from typing import Dict, List, Optional, Set
 import pandas as pd
 
 from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
-from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, TIMEOUT_SECONDS
+from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, TIMEOUT_SECONDS
+from codelyzer.metrics import FileMetrics, ProjectMetrics
 from codelyzer.console import console, create_analysis_progress_bar
 from codelyzer.analyzers import SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
     PatternBasedAnalyzer

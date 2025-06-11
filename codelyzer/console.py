@@ -13,7 +13,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.table import Table
 
-from codelyzer.config import ProjectMetrics, ComplexityLevel
+from codelyzer.metrics import ProjectMetrics, ComplexityLevel
 
 # Main console instance used throughout the application
 console = Console()

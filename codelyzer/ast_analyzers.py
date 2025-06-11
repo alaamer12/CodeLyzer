@@ -15,7 +15,6 @@ from codelyzer.console import console
 from codelyzer.metrics import FileMetrics, BaseFileMetrics
 
 
-
 class ASTAnalyzer(ABC):
     """Base class for language-specific AST analyzers"""
 

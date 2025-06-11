@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Protocol
 
-from codelyzer.config import DEFAULT_EXCLUDED_FILES, FileMetrics, ProjectMetrics, ComplexityLevel, SecurityLevel
+from codelyzer.config import DEFAULT_EXCLUDED_FILES
+from codelyzer.metrics import FileMetrics, ProjectMetrics, ComplexityLevel, SecurityLevel
 
 
 class FileDiscovery(Protocol):
