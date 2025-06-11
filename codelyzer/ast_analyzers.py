@@ -1,12 +1,20 @@
-import concurrent.futures
 import os
+import concurrent.futures
 from abc import ABC, abstractmethod
-from typing import Dict, List, Type, Optional, ClassVar, Any
+from typing import Any, ClassVar, Dict, List, Optional, Type
 from tree_sitter import Language, Parser
 
-from codelyzer.config import FILE_SIZE_LIMIT, PARSE_TIMEOUT, GRAMMAR_PATH
+from codelyzer.config import PARSE_TIMEOUT, FILE_SIZE_LIMIT
 from codelyzer.console import console
 from codelyzer.metrics import FileMetrics, BaseFileMetrics, MetricProvider
+
+# Import tree-sitter and language packages
+try:
+    import tree_sitter_python
+    import tree_sitter_javascript
+    TREE_SITTER_AVAILABLE = True
+except ImportError:
+    TREE_SITTER_AVAILABLE = False
 
 
 class ASTAnalyzer(ABC):
@@ -196,7 +204,7 @@ class TreeSitterASTAnalyzer(ASTAnalyzer, ABC):
     # Will be set by subclasses
     language_parser: Optional[Parser] = None
     language_name: str = ""
-    grammar_file: str = ""
+    language_module = None  # Reference to the language module (tree_sitter_python, etc.)
 
     # Comment node types specific to the language
     comment_types: List[str] = []
@@ -207,17 +215,24 @@ class TreeSitterASTAnalyzer(ASTAnalyzer, ABC):
         if cls.language_parser is not None:
             return  # Already initialized
 
-        try:
-            grammar_path = os.path.join(GRAMMAR_PATH, cls.grammar_file)
-            if not os.path.exists(grammar_path):
-                console.print(f"[red]Error: Grammar file not found: {grammar_path}[/red]")
-                return
+        if not TREE_SITTER_AVAILABLE:
+            console.print(f"[red]Error: tree-sitter or language modules not available[/red]")
+            cls.language_parser = None
+            return
 
-            # Create a Language object with just the grammar file path
-            language = Language(grammar_path)
+        try:
+            # Get language function from the module
+            if cls.language_module is None:
+                console.print(f"[red]Error: No language module specified for {cls.language_name}[/red]")
+                cls.language_parser = None
+                return
+                
+            # Create Language object using the module's language function
+            language = Language(cls.language_module.language())
             parser = Parser()
             parser.language = language
             cls.language_parser = parser
+            console.print(f"[green]Successfully initialized {cls.language_name} parser[/green]")
         except Exception as e:
             console.print(f"[red]Error initializing {cls.language_name} parser: {str(e)}[/red]")
             cls.language_parser = None
@@ -282,12 +297,11 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
 
     extensions = ['.py']
     language_name = "python"
-    grammar_file = "py-lang.so"
+    language_module = tree_sitter_python if TREE_SITTER_AVAILABLE else None
     comment_types = ["comment", "string"]  # Python docstrings are string nodes
 
     def __init__(self):
         """Initialize the Python analyzer"""
-        # Initialize the parser
         self.__class__.initialize_parser()
 
     @classmethod
@@ -377,12 +391,11 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
 
     extensions = ['.js', '.jsx', '.ts', '.tsx']
     language_name = "javascript"
-    grammar_file = "js-lang.so"
+    language_module = tree_sitter_javascript if TREE_SITTER_AVAILABLE else None
     comment_types = ["comment", "comment_block", "jsx_comment", "multiline_comment"]
 
     def __init__(self):
         """Initialize the JavaScript analyzer"""
-        # Initialize the parser
         self.__class__.initialize_parser()
 
     @classmethod
@@ -472,6 +485,11 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
 # Initialize the analyzers
 def initialize_analyzers():
     """Initialize all tree-sitter analyzers"""
+    if not TREE_SITTER_AVAILABLE:
+        console.print("[yellow]Warning: tree-sitter or language modules not available.[/yellow]")
+        console.print("[yellow]Install them with: pip install tree-sitter tree-sitter-python tree-sitter-javascript[/yellow]")
+        return
+    
     PythonASTAnalyzer.initialize_parser()
     JavaScriptASTAnalyzer.initialize_parser()
     console.print("[green]Initialized tree-sitter parsers for: Python, JavaScript[/green]")
