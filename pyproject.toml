@@ -20,10 +20,11 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 rich = "^14.0.0"
 pandas = "^2.3.0"
 typer = "^0.16.0"
+tree-sitter = "^0.24.0"
 
 
 [tool.poetry.scripts]
