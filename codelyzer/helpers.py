@@ -319,46 +319,10 @@ class ProjectMetricsProcessor:
                                        key=lambda x: x.sloc, reverse=True)[:10]
 
         # Complexity distribution
-        self._calculate_complexity_distribution(metrics)
+        Scoring.calculate_complexity_distribution(metrics)
 
         # Quality scores
-        self._calculate_quality_scores(metrics)
-
-    def _calculate_complexity_distribution(self, metrics: ProjectMetrics) -> None:
-        """Calculate complexity distribution across files"""
-        for file_metrics in metrics.file_metrics:
-            level = self._determine_complexity_level(file_metrics.complexity_score)
-            metrics.complexity_distribution[level] = metrics.complexity_distribution.get(level, 0) + 1
-
-    def _determine_complexity_level(self, score: float) -> ComplexityLevel:
-        """Determine complexity level based on score"""
-        if score < 50:
-            return ComplexityLevel.TRIVIAL
-        elif score < 200:
-            return ComplexityLevel.LOW
-        elif score < 500:
-            return ComplexityLevel.MODERATE
-        elif score < 1000:
-            return ComplexityLevel.HIGH
-        elif score < 2000:
-            return ComplexityLevel.VERY_HIGH
-        else:
-            return ComplexityLevel.EXTREME
-
-    def _calculate_quality_scores(self, metrics: ProjectMetrics) -> None:
-        """Calculate code quality scores"""
-        if metrics.total_sloc <= 0:
-            return
-
-        # Code quality score
-        metrics.code_quality_score = min(100, max(0,
-                                                  int(100 - (sum(len(f.security_issues) + len(f.code_smells)
-                                                                 for f in
-                                                                 metrics.file_metrics) / metrics.total_files * 10))))
-
-        # Maintainability score
-        avg_maintainability = sum(f.maintainability_index for f in metrics.file_metrics) / len(metrics.file_metrics)
-        metrics.maintainability_score = max(0, min(100, int(avg_maintainability)))
+        Scoring.calculate_quality_scores(metrics)
 
 
 class Scoring:
@@ -377,3 +341,42 @@ class Scoring:
         project_metrics.total_methods += metrics.methods or 0
         project_metrics.project_size += metrics.file_size or 0
         return project_metrics
+    
+    @staticmethod
+    def calculate_complexity_distribution(metrics: ProjectMetrics) -> None:
+        """Calculate complexity distribution across files"""
+        for file_metrics in metrics.file_metrics:
+            level = Scoring.determine_complexity_level(file_metrics.complexity_score)
+            metrics.complexity_distribution[level] = metrics.complexity_distribution.get(level, 0) + 1
+
+    @staticmethod
+    def determine_complexity_level(score: float) -> ComplexityLevel:
+        """Determine complexity level based on score"""
+        if score < 50:
+            return ComplexityLevel.TRIVIAL
+        elif score < 200:
+            return ComplexityLevel.LOW
+        elif score < 500:
+            return ComplexityLevel.MODERATE
+        elif score < 1000:
+            return ComplexityLevel.HIGH
+        elif score < 2000:
+            return ComplexityLevel.VERY_HIGH
+        else:
+            return ComplexityLevel.EXTREME
+
+    @staticmethod
+    def calculate_quality_scores(metrics: ProjectMetrics) -> None:
+        """Calculate code quality scores"""
+        if metrics.total_sloc <= 0:
+            return
+
+        # Code quality score
+        metrics.code_quality_score = min(100, max(0,
+                                                  int(100 - (sum(len(f.security_issues) + len(f.code_smells)
+                                                                 for f in
+                                                                 metrics.file_metrics) / metrics.total_files * 10))))
+
+        # Maintainability score
+        avg_maintainability = sum(f.maintainability_index for f in metrics.file_metrics) / len(metrics.file_metrics)
+        metrics.maintainability_score = max(0, min(100, int(avg_maintainability)))
