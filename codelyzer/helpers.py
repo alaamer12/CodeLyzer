@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Protocol
 
+from codelyzer.ast_analyzers import ASTAnalyzer
 from codelyzer.config import DEFAULT_EXCLUDED_FILES
 from codelyzer.metrics import FileMetrics, ProjectMetrics, ComplexityLevel, SecurityLevel
 
@@ -51,13 +52,25 @@ class StandardFileDiscovery:
 
     @staticmethod
     def _build_language_detectors(language_configs: Dict) -> Dict[str, List[str]]:
-        """Build file extension to language mapping"""
-        detectors = {}
+        """Build file extension to language mapping, giving priority to AST analyzers."""
+        detectors: Dict[str, List[str]] = {}
+
+        # First, populate with AST analyzers as the source of truth
+        for ext, analyzer_class in ASTAnalyzer.ANALYZERS.items():
+            lang_name = analyzer_class._get_language_name()
+            if ext not in detectors:
+                detectors[ext] = []
+            if lang_name not in detectors[ext]:
+                # Insert at the front to give it priority
+                detectors[ext].insert(0, lang_name)
+
+        # Then, add from language_configs for languages without AST analyzers or for fallbacks
         for lang, config in language_configs.items():
             for ext in config['extensions']:
                 if ext not in detectors:
                     detectors[ext] = []
-                detectors[ext].append(lang)
+                if lang not in detectors[ext]:
+                    detectors[ext].append(lang)
         return detectors
 
     def discover_files(self, root_path: str) -> List[str]:

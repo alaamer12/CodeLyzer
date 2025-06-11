@@ -156,7 +156,7 @@ class ASTAnalyzer(ABC):
         metrics.base.blanks = sum(1 for line in lines if not line.strip())
 
         # Comments need to be counted by language-specific logic
-        comment_lines = self._count_comment_lines(content)
+        comment_lines = self._count_comment_lines(content, metrics.base.file_path)
         metrics.base.comments = comment_lines
         metrics.base.sloc = metrics.base.loc - metrics.base.blanks - metrics.base.comments
 
@@ -198,7 +198,7 @@ class ASTAnalyzer(ABC):
         pass
 
     @abstractmethod
-    def _count_comment_lines(self, content: str) -> int:
+    def _count_comment_lines(self, content: str, file_path: str) -> int:
         """Count comment lines in the file content"""
         pass
 
@@ -266,7 +266,7 @@ class TreeSitterASTAnalyzer(ASTAnalyzer, ABC):
                 console.print(f"[yellow]Warning: Parsing {file_path} timed out or failed[/yellow]")
                 return e
 
-    def _count_comment_lines(self, content: str) -> int:
+    def _count_comment_lines(self, content: str, file_path: str) -> int:
         """Count comment lines using tree-sitter"""
         try:
             if self.language_parser is None:
@@ -517,7 +517,8 @@ class TypeScriptASTAnalyzer(TreeSitterASTAnalyzer):
 
     def __init__(self):
         """Initialize the TypeScript analyzer"""
-        self.language_parser = None  # Reset to ensure it's initialized for the correct variant
+        self._ts_parser: Optional[Parser] = None
+        self._tsx_parser: Optional[Parser] = None
 
     @classmethod
     def _get_language_name(cls) -> str:
@@ -533,40 +534,34 @@ class TypeScriptASTAnalyzer(TreeSitterASTAnalyzer):
 
     def _parse_with_timeout(self, content: str, file_path: str) -> Any:
         """Parse the file content into an AST with timeout handling"""
-        # Determine which language module to use based on file extension
-        if self.language_parser is None:
-            ext = os.path.splitext(file_path)[1].lower()
+        ext = os.path.splitext(file_path)[1].lower()
+        parser: Optional[Parser] = None
+
+        try:
             if ext == '.tsx':
-                # Use the TSX language module
-                try:
-                    self.language_module = tree_sitter_typescript.language_tsx()
-                    language = Language(tree_sitter_typescript.language_typescript())
-                    parser = Parser()
-                    parser.language = language
-                    self.language_parser = parser
-                    console.print(f"[green]Successfully initialized TSX parser[/green]")
-                except Exception as e:
-                    console.print(f"[red]Error initializing TSX parser: {str(e)}[/red]")
-                    self.language_parser = None
-                    return Exception(f"Parser for TSX could not be initialized: {str(e)}")
+                if self._tsx_parser is None:
+                    language = Language(tree_sitter_typescript.language_tsx())
+                    self._tsx_parser = Parser()
+                    self._tsx_parser.language = language
+                parser = self._tsx_parser
             else:
-                # Use the TypeScript language module
-                try:
-                    self.language_module = tree_sitter_typescript.language_tsx()
+                if self._ts_parser is None:
                     language = Language(tree_sitter_typescript.language_typescript())
-                    parser = Parser()
-                    parser.language = language
-                    self.language_parser = parser
-                    console.print(f"[green]Successfully initialized TypeScript parser[/green]")
-                except Exception as e:
-                    console.print(f"[red]Error initializing TypeScript parser: {str(e)}[/red]")
-                    self.language_parser = None
-                    return Exception(f"Parser for TypeScript could not be initialized: {str(e)}")
+                    self._ts_parser = Parser()
+                    self._ts_parser.language = language
+                parser = self._ts_parser
+        except Exception as e:
+            lang_name = "TSX" if ext == ".tsx" else "TypeScript"
+            console.print(f"[red]Error initializing {lang_name} parser: {str(e)}[/red]")
+            return Exception(f"Parser for {lang_name} could not be initialized: {str(e)}")
+
+        if parser is None:
+            return Exception(f"Parser for {file_path} could not be obtained.")
 
         # Define a function to do the parsing
         def parse_content():
             try:
-                tree = self.language_parser.parse(bytes(content, 'utf8'))
+                tree = parser.parse(bytes(content, 'utf8'))
                 return tree
             except Exception as e:
                 return e
@@ -660,6 +655,51 @@ class TypeScriptASTAnalyzer(TreeSitterASTAnalyzer):
         traverse(root_node)
         return complexity
 
+    def _count_comment_lines(self, content: str, file_path: str) -> int:
+        """Count comment lines using tree-sitter, choosing the correct parser."""
+        ext = os.path.splitext(file_path)[1].lower()
+        parser: Optional[Parser] = None
+
+        try:
+            if ext == '.tsx':
+                if self._tsx_parser is None:
+                    language = Language(tree_sitter_typescript.language_tsx())
+                    self._tsx_parser = Parser()
+                    self._tsx_parser.language = language
+                parser = self._tsx_parser
+            else:
+                if self._ts_parser is None:
+                    language = Language(tree_sitter_typescript.language_typescript())
+                    self._ts_parser = Parser()
+                    self._ts_parser.language = language
+                parser = self._ts_parser
+        except Exception:
+            return 0  # Fail silently, parser init errors are already logged.
+
+        if parser is None:
+            return 0
+
+        try:
+            tree = parser.parse(bytes(content, 'utf8'))
+            root_node = tree.root_node
+            comment_lines = set()
+
+            def process_node(node):
+                if node.type in self.comment_types:
+                    start_line = node.start_point[0]
+                    end_line = node.end_point[0]
+                    for line in range(start_line, end_line + 1):
+                        comment_lines.add(line)
+
+                for child in node.children:
+                    process_node(child)
+
+            process_node(root_node)
+            return len(comment_lines)
+        except Exception as e:
+            console.print(f"[yellow]Warning: Error counting comment lines in {file_path}: {str(e)}[/yellow]")
+            return 0
+
 
 class RustStubASTAnalyzer(ASTAnalyzer):
     """Stub analyzer for Rust files when tree-sitter-rust is incompatible"""
@@ -721,7 +761,7 @@ class RustStubASTAnalyzer(ASTAnalyzer):
             metrics.complexity.cyclomatic_complexity = complexity
             metrics.complexity.complexity_score = float(complexity)
     
-    def _count_comment_lines(self, content: str) -> int:
+    def _count_comment_lines(self, content: str, file_path: str) -> int:
         """Count comment lines by simple text analysis"""
         if not content:
             return 0
