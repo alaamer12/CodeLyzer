@@ -91,6 +91,7 @@ def create_complexity_table(metrics: ProjectMetrics) -> Table:
     total_files = sum(metrics.complexity_distribution.values())
 
     for level in ComplexityLevel:
+        # noinspection PyTypeChecker
         count = metrics.complexity_distribution.get(level, 0)
         percentage = (count / total_files) * 100 if total_files > 0 else 0
 

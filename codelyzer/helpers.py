@@ -108,11 +108,13 @@ class ProjectMetricsProcessor:
 
         # Sort by complexity
         metrics.file_metrics.sort(key=lambda x: x.complexity_score, reverse=True)
-        metrics.most_complex_files = metrics.file_metrics[:10]
+        # Update most complex files - use nested attribute instead of top-level property
+        metrics.complexity.most_complex_files = [file.file_path for file in metrics.file_metrics[:10]]
 
         # Sort by size
-        metrics.largest_files = sorted(metrics.file_metrics,
-                                       key=lambda x: x.sloc, reverse=True)[:10]
+        sorted_by_size = sorted(metrics.file_metrics, key=lambda x: x.sloc, reverse=True)
+        # Update largest files - use nested attribute instead of top-level property
+        metrics.code_quality.largest_files = [file.file_path for file in sorted_by_size[:10]]
 
         # Complexity distribution
         Scoring.calculate_complexity_distribution(metrics)

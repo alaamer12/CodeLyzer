@@ -4,7 +4,6 @@ from enum import StrEnum, auto
 from typing import Dict, List, Any, Optional
 
 
-# =========== Base Enums ===========
 class MetricLevel(StrEnum):
     """Base enum for all metric levels"""
     UNDEFINED = auto()
@@ -264,7 +263,6 @@ class FileMetrics:
         return self.custom_metrics.get(name)
 
 
-# =========== Project Metrics ===========
 @dataclass
 class BaseProjectMetrics:
     """Basic project-wide metrics"""
