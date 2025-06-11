@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+import math
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Protocol, Union
-import re
-import math
 
 from codelyzer.config import DEFAULT_EXCLUDED_FILES, FileMetrics, ProjectMetrics, ComplexityLevel, FILE_SIZE_LIMIT, \
     TIMEOUT_SECONDS
 from codelyzer.console import console
-
 from codelyzer.utils import FunctionWithTimeout
 
 
@@ -360,3 +359,21 @@ class ProjectMetricsProcessor:
         # Maintainability score
         avg_maintainability = sum(f.maintainability_index for f in metrics.file_metrics) / len(metrics.file_metrics)
         metrics.maintainability_score = max(0, min(100, int(avg_maintainability)))
+
+
+class Scoring:
+    """Class for handling code scoring and metrics aggregation"""
+
+    @staticmethod
+    def update_aggregate_metrics(project_metrics: ProjectMetrics, metrics: FileMetrics) -> ProjectMetrics:
+        """Update aggregate metrics"""
+        project_metrics.total_files += 1
+        project_metrics.total_loc += metrics.loc or 0
+        project_metrics.total_sloc += metrics.sloc or 0
+        project_metrics.total_comments += metrics.comments or 0
+        project_metrics.total_blanks += metrics.blanks or 0
+        project_metrics.total_classes += metrics.classes or 0
+        project_metrics.total_functions += metrics.functions or 0
+        project_metrics.total_methods += metrics.methods or 0
+        project_metrics.project_size += metrics.file_size or 0
+        return project_metrics

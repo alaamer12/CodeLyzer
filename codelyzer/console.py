@@ -3,14 +3,15 @@ Console and display utilities for CodeLyzer.
 Centralizes all console output, logging, progress bars, and rich display components.
 """
 from pathlib import Path
+from typing import List
 
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.markdown import Markdown
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich import box
+from rich.console import Console
 from rich.layout import Layout
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
+from rich.table import Table
 
 from codelyzer.config import ProjectMetrics, ComplexityLevel
 

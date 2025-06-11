@@ -1,9 +1,10 @@
-import os
 import json
-from pathlib import Path
+import os
 from datetime import datetime
+from pathlib import Path
 
 from codelyzer.config import ProjectMetrics, ComplexityLevel
+
 
 def generate_direct_html(metrics: ProjectMetrics) -> str:
     """Generate HTML directly without using format strings to avoid issues"""

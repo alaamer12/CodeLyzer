@@ -4,18 +4,19 @@ Enhanced Codebase Analyzer
 A powerful, robust tool for analyzing code repositories with beautiful terminal output.
 Supports multiple programming languages with detailed metrics and visualizations.
 """
-import pandas as pd
-import os
 import json
+import os
 import time
 from typing import Dict, List, Optional, Set
 
+import pandas as pd
+
 from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
 from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, TIMEOUT_SECONDS
-from codelyzer.utils import FunctionWithTimeout
 from codelyzer.console import console, create_analysis_progress_bar
 from codelyzer.helpers import StandardFileDiscovery, SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
-    PatternBasedAnalyzer, ProjectMetricsProcessor
+    PatternBasedAnalyzer, ProjectMetricsProcessor, Scoring
+from codelyzer.utils import FunctionWithTimeout
 
 
 def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
@@ -251,24 +252,6 @@ class AdvancedCodeAnalyzer:
             top_langs = sorted(language_stats.items(), key=lambda x: x[1], reverse=True)[:3]
             lang_summary = ", ".join(f"{lang}: {count}" for lang, count in top_langs)
             console.print(f"[green]Top languages: {lang_summary}[/green]")
-
-
-class Scoring:
-    """Class for handling code scoring and metrics aggregation"""
-
-    @staticmethod
-    def update_aggregate_metrics(project_metrics: ProjectMetrics, metrics: FileMetrics) -> ProjectMetrics:
-        """Update aggregate metrics"""
-        project_metrics.total_files += 1
-        project_metrics.total_loc += metrics.loc or 0
-        project_metrics.total_sloc += metrics.sloc or 0
-        project_metrics.total_comments += metrics.comments or 0
-        project_metrics.total_blanks += metrics.blanks or 0
-        project_metrics.total_classes += metrics.classes or 0
-        project_metrics.total_functions += metrics.functions or 0
-        project_metrics.total_methods += metrics.methods or 0
-        project_metrics.project_size += metrics.file_size or 0
-        return project_metrics
 
 
 class ReportExport:

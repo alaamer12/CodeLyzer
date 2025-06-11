@@ -13,24 +13,24 @@ from codelyzer.utils import FunctionWithTimeout
 
 class ASTAnalyzer(ABC):
     """Base class for language-specific AST analyzers"""
-    
+
     # Class attribute mapping file extension to analyzer class
     ANALYZERS: ClassVar[Dict[str, Type['ASTAnalyzer']]] = {}
-    
+
     # Class attribute for extensions supported by this analyzer
     extensions: ClassVar[List[str]] = []
-    
+
     def __init_subclass__(cls, **kwargs):
         """Register each analyzer subclass with its supported extensions"""
         super().__init_subclass__(**kwargs)
         for ext in cls.extensions:
             ASTAnalyzer.ANALYZERS[ext] = cls
-    
+
     @classmethod
     def get_analyzer_for_extension(cls, extension: str) -> Optional[Type['ASTAnalyzer']]:
         """Factory method to get the appropriate analyzer for a file extension"""
         return cls.ANALYZERS.get(extension.lower())
-    
+
     def analyze_file(self, file_path: str) -> Optional[FileMetrics]:
         """Analyze a file and return its metrics - common implementation with template pattern"""
         try:
@@ -85,27 +85,27 @@ class ASTAnalyzer(ABC):
             metrics = self._create_metrics_for_file(file_path)
             metrics.loc = metrics.sloc = 0
             return metrics
-    
+
     def _calculate_line_counts(self, content: str, metrics: FileMetrics) -> None:
         """Count different types of lines in the file content"""
         if not content:
             metrics.loc = metrics.sloc = metrics.blanks = metrics.comments = 0
             return
-            
+
         lines = content.split('\n')
         metrics.loc = len(lines)
         metrics.blanks = sum(1 for line in lines if not line.strip())
-        
+
         # Comments need to be counted by language-specific logic
         comment_lines = self._count_comment_lines(content)
         metrics.comments = comment_lines
         metrics.sloc = metrics.loc - metrics.blanks - metrics.comments
-    
+
     def _create_metrics_for_file(self, file_path: str) -> FileMetrics:
         """Create a FileMetrics object with the appropriate language"""
         language = self._detect_language(file_path)
         return FileMetrics(file_path=file_path, language=language)
-    
+
     def _detect_language(self, file_path: str) -> str:
         """Detect language from file extension - can be overridden if needed"""
         ext = os.path.splitext(file_path)[1].lower()
@@ -113,22 +113,22 @@ class ASTAnalyzer(ABC):
             if ext in language_class.extensions:
                 return language_class._get_language_name()
         return "unknown"
-    
+
     @classmethod
     def _get_language_name(cls) -> str:
         """Return the name of the language this analyzer handles"""
         return cls.__name__.replace('ASTAnalyzer', '').lower()
-    
+
     @abstractmethod
     def _parse_with_timeout(self, content: str, file_path: str) -> Any:
         """Parse the file content into an AST with timeout handling"""
         pass
-    
+
     @abstractmethod
     def _calculate_metrics(self, ast_data: Any, metrics: FileMetrics, content: str = None) -> None:
         """Calculate language-specific metrics from the AST"""
         pass
-    
+
     @abstractmethod
     def _count_comment_lines(self, content: str) -> int:
         """Count comment lines in the file content"""
@@ -137,15 +137,16 @@ class ASTAnalyzer(ABC):
 
 class PythonASTAnalyzer(ASTAnalyzer):
     """Analyzer for Python files using the Abstract Syntax Tree"""
-    
+
     extensions = ['.py']
-    
+
     @classmethod
     def _get_language_name(cls) -> str:
         return "python"
-    
+
     def _parse_with_timeout(self, content: str, file_path: str) -> ast.AST:
         """Parse Python code into AST with a timeout to handle large files"""
+
         def parse_ast():
             try:
                 return ast.parse(content, filename=file_path)
@@ -187,7 +188,7 @@ class PythonASTAnalyzer(ASTAnalyzer):
 
         # Cyclomatic complexity
         metrics.cyclomatic_complexity = self._calculate_cyclomatic_complexity(tree)
-        
+
         # Calculate line counts if content was provided
         if content and metrics.loc == 0:
             self._calculate_line_counts(content, metrics)
@@ -208,19 +209,19 @@ class PythonASTAnalyzer(ASTAnalyzer):
                 complexity += len(node.values) - 1
 
         return complexity
-        
+
     def _count_comment_lines(self, content: str) -> int:
         """Count comment lines in Python code"""
         if not content:
             return 0
-            
+
         lines = content.split('\n')
         comment_count = 0
         in_multiline_comment = False
-        
+
         for line in lines:
             stripped = line.strip()
-            
+
             # Handle multiline comments (docstrings)
             if in_multiline_comment:
                 comment_count += 1
@@ -230,17 +231,18 @@ class PythonASTAnalyzer(ASTAnalyzer):
                 comment_count += 1
             elif stripped.startswith('"""') or stripped.startswith("'''"):
                 comment_count += 1
-                if not (stripped.endswith('"""') and len(stripped) > 3) and not (stripped.endswith("'''") and len(stripped) > 3):
+                if not (stripped.endswith('"""') and len(stripped) > 3) and not (
+                        stripped.endswith("'''") and len(stripped) > 3):
                     in_multiline_comment = True
-                    
+
         return comment_count
 
 
 class JavaScriptASTAnalyzer(ASTAnalyzer):
     """Analyzer for JavaScript/TypeScript files using Abstract Syntax Tree"""
-    
+
     extensions = ['.js', '.jsx', '.ts', '.tsx']
-    
+
     def __init__(self):
         # Check if esprima is available
         self.use_python_esprima = self._ensure_esprima_available()
@@ -271,7 +273,7 @@ class JavaScriptASTAnalyzer(ASTAnalyzer):
                     return True
                 except Exception:
                     raise Exception("Cannot install or use JavaScript parser")
-    
+
     @classmethod
     def _get_language_name(cls) -> str:
         return "javascript"  # Base language name, more specific detection in _detect_language
@@ -288,6 +290,7 @@ class JavaScriptASTAnalyzer(ASTAnalyzer):
 
     def _parse_with_timeout(self, content: str, file_path: str):
         """Parse JavaScript code into AST with timeout"""
+
         def parse_ast():
             try:
                 if self.use_python_esprima:
@@ -355,13 +358,13 @@ class JavaScriptASTAnalyzer(ASTAnalyzer):
         """Calculate various metrics from the AST"""
         if content:
             self._calculate_line_counts(content, metrics)
-            
+
         # Analyze AST structure for metrics
         context = self._analyze_ast_structure(ast_data)
         metrics.classes = context['classes']
         metrics.functions = context['functions']
         metrics.methods = context['methods']
-        metrics.methods_per_class = context['methods_per_class'] 
+        metrics.methods_per_class = context['methods_per_class']
         metrics.imports = sorted(context['imports'])
 
         # Calculate complexity
@@ -452,7 +455,7 @@ class JavaScriptASTAnalyzer(ASTAnalyzer):
         """Count comment lines in JavaScript code"""
         if not content:
             return 0
-            
+
         lines = content.split('\n')
         comment_count = 0
         in_block_comment = False

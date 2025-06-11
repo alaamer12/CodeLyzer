@@ -1,14 +1,16 @@
 from pathlib import Path
 from typing import List
-import typer
-from rich.table import Table
-from rich.panel import Panel
-from rich import box
 
-from codelyzer.core import AdvancedCodeAnalyzer, ReportExport
-from codelyzer.config import LANGUAGE_CONFIGS
-from codelyzer.console import console, create_summary_panel, display_initial_info, display_final_summary, display_verbose_info, create_and_display_layout
+import typer
+from rich import box
+from rich.panel import Panel
+from rich.table import Table
+
 from codelyzer._html import generate_direct_html
+from codelyzer.config import LANGUAGE_CONFIGS
+from codelyzer.console import console, create_summary_panel, display_initial_info, display_final_summary, \
+    display_verbose_info, create_and_display_layout
+from codelyzer.core import AdvancedCodeAnalyzer, ReportExport
 
 app = typer.Typer(
     name="codelyzer",
@@ -33,14 +35,14 @@ def generate_reports(metrics, output_format: str, output_dir: str, project_path:
         output_path.mkdir(exist_ok=True)
 
         html_file = output_path / f"{project_path.name}_analysis.html"
-        
+
         # Generate HTML content using our direct method
         html_content = generate_direct_html(metrics)
-        
+
         # Write to file
         with open(html_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
-            
+
         console.print(f"[green]✅ HTML report saved:[/green] [link]{html_file}[/link]")
 
     if output_format in ["json", "all"]:
@@ -192,5 +194,10 @@ def languages():
     console.print(lang_table)
 
 
-if __name__ == "__main__":
+def main():
+    # Just call app() to fix pyproject.toml script section
     app()
+
+
+if __name__ == "__main__":
+    main()

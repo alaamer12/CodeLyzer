@@ -1,7 +1,6 @@
+import platform
 from dataclasses import dataclass, field
 from enum import StrEnum
-
-import platform
 from typing import Dict, List
 
 # Language configurations
