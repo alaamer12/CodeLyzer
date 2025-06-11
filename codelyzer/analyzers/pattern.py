@@ -15,43 +15,16 @@ class PatternBasedAnalyzer(MetricProvider):
             "jsx": self._get_js_patterns()
         }
 
-    def analyze_file(self, file_path_or_metrics: Union[str, FileMetrics], file_content: str = None, ast_data: Any = None) -> Optional[FileMetrics]:
+    def analyze_file(self, metrics: FileMetrics, content: str = None, ast_data: Any = None) -> None:
         """
         Analyze file for design patterns and anti-patterns.
-        Can be called in two ways:
-        1. analyze_file(file_metrics, file_content, ast_data) - The MetricProvider interface method
-        2. analyze_file(file_path, language) - The method used directly by core.py
+        This method conforms to the MetricProvider interface.
         """
-        # Handle the direct file path case (from core.py)
-        if isinstance(file_path_or_metrics, str):
-            from codelyzer.metrics import create_file_metrics
-            
-            file_path = file_path_or_metrics
-            language = ast_data  # In this case, ast_data is actually the language parameter
-            
-            # Create metrics object
-            metrics = create_file_metrics(file_path, language)
-            
-            # Read content
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-            except Exception:
-                return metrics
-                
-            # Analyze content
-            self.analyze_file(metrics, content, None)
-            
-            return metrics
-        
-        # Handle the standard MetricProvider interface case
-        file_metrics = file_path_or_metrics
-        language = file_metrics.language
-
         # Skip if content is empty
-        if not file_content:
+        if not content:
             return
 
+        language = metrics.language
         patterns = self.design_patterns.get(language, {})
         if not patterns:
             return
@@ -60,9 +33,9 @@ class PatternBasedAnalyzer(MetricProvider):
         for pattern_name, pattern_info in patterns.items():
             detector_func = pattern_info.get('detector')
             if detector_func:
-                locations = detector_func(file_content, ast_data)
+                locations = detector_func(content, ast_data)
                 for location in locations:
-                    file_metrics.patterns.add_pattern(pattern_name, location)
+                    metrics.patterns.add_pattern(pattern_name, location)
 
     def analyze_project(self, project_metrics: ProjectMetrics) -> None:
         """Analyze project-level pattern metrics"""

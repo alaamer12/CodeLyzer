@@ -181,7 +181,7 @@ DEFAULT_EXCLUDED_FILES = {
 }
 
 # Constants for file processing
-FILE_SIZE_LIMIT = 10 * 1024 * 1024  # 10MB
+FILE_SIZE_LIMIT = 20 * 1024 * 1024  # 20MB
 TIMEOUT_SECONDS = 5  # seconds
 MAX_REPO_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
 IS_WINDOWS = platform.system() == 'Windows'

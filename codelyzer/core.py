@@ -149,23 +149,19 @@ class AdvancedCodeAnalyzer:
         """Get metrics and content for a file using appropriate analyzer"""
         analyzer = self.language_analyzers.get(language)
         content = None
+        metrics = None
 
         if analyzer:
             metrics = analyzer.analyze_file(file_path)
             if metrics:
                 metrics.base.file_size = file_size
+                # Content is read inside the analyzer, but we might need it here for other analyzers
+                # if the AST-based one doesn't also run them. Let's read it if not present.
                 content = read_content(file_path)
         else:
-            # Fall back to pattern-based analysis
-            result = self.pattern_analyzer.analyze_file(file_path, language)
-            if isinstance(result, tuple):
-                metrics, content = result
-            else:
-                metrics = result
-                content = None
-
-            if metrics:
-                metrics.base.file_size = file_size
+            # Fall back to creating basic metrics for non-AST languages
+            metrics = create_file_metrics(file_path, language, file_size)
+            content = read_content(file_path)
 
         return metrics, content
 
