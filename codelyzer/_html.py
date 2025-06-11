@@ -2,35 +2,39 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
+from typing import List, Tuple, Dict, Any
 
 from codelyzer.config import ProjectMetrics, ComplexityLevel
 
 
-import json
-import os
-from datetime import datetime
-from pathlib import Path
-from typing import List, Tuple
-
 class PlotReportGenerator:
-    """Generate plotting components for codebase analysis reports."""
+    """Generate plotting components for codebase analysis reports using Plotly."""
     
-    def __init__(self):
-        self._language_labels_json = ""
-        self._language_data_json = ""
-        self._complexity_labels_json = ""
-        self._complexity_data_json = ""
+    def __init__(self) -> None:
+        self._language_data: Dict[str, Any] = {}
+        self._complexity_data: Dict[str, Any] = {}
     
     def prepare_chart_data(self, metrics: 'ProjectMetrics') -> None:
-        """Prepare JSON data for charts."""
-        self._language_labels_json = json.dumps(list(metrics.languages.keys()))
-        self._language_data_json = json.dumps(list(metrics.languages.values()))
+        """Prepare data for Plotly charts."""
+        # Language distribution data
+        self._language_data = {
+            'labels': list(metrics.languages.keys()),
+            'values': list(metrics.languages.values()),
+            'colors': [
+                '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#6366f1'
+            ]
+        }
         
+        # Complexity distribution data
         complexity_labels = [level.replace('_', ' ').title() for level in ComplexityLevel]
-        complexity_data = [metrics.complexity_distribution.get(level, 0) for level in ComplexityLevel]
+        complexity_values = [metrics.complexity_distribution.get(level, 0) for level in ComplexityLevel]
         
-        self._complexity_labels_json = json.dumps(complexity_labels)
-        self._complexity_data_json = json.dumps(complexity_data)
+        self._complexity_data = {
+            'labels': complexity_labels,
+            'values': complexity_values,
+            'colors': ['#10b981', '#22c55e', '#f59e0b', '#f97316', '#ef4444', '#dc2626']
+        }
     
     def get_charts_grid_html(self) -> str:
         """Get the charts grid HTML section."""
@@ -39,122 +43,84 @@ class PlotReportGenerator:
             <div class="chart-container">
                 <h3><i class="fas fa-globe"></i> Language Distribution</h3>
                 <div class="chart-wrapper">
-                    <canvas id="languageChart"></canvas>
+                    <div id="languageChart" style="width: 100%; height: 100%;"></div>
                 </div>
             </div>
             
             <div class="chart-container">
                 <h3><i class="fas fa-layer-group"></i> Complexity Distribution</h3>
                 <div class="chart-wrapper">
-                    <canvas id="complexityChart"></canvas>
+                    <div id="complexityChart" style="width: 100%; height: 100%;"></div>
                 </div>
             </div>
         </div>'''
     
     def get_chart_javascript(self) -> str:
-        """Get the JavaScript section for charts and animations."""
+        """Get the JavaScript section for Plotly charts and animations."""
+        language_config = json.dumps(self._language_data)
+        complexity_config = json.dumps(self._complexity_data)
+        
         return f'''
-        const chartOptions = {{
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {{
-                legend: {{
-                    position: 'bottom',
-                    labels: {{
-                        usePointStyle: true,
-                        padding: 20,
-                        font: {{
-                            size: 12
-                        }}
-                    }}
-                }}
-            }}
-        }};
-
         // Language Distribution Chart
-        const languageCtx = document.getElementById('languageChart').getContext('2d');
-        new Chart(languageCtx, {{
-            type: 'doughnut',
-            data: {{
-                labels: {self._language_labels_json},
-                datasets: [{{
-                    data: {self._language_data_json},
-                    backgroundColor: [
-                        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-                        '#06b6d4', '#f97316', '#84cc16', '#ec4899', '#6366f1'
-                    ],
-                    borderWidth: 2,
-                    borderColor: '#ffffff',
-                    hoverBorderWidth: 3
-                }}]
-            }},
-            options: {{
-                ...chartOptions,
-                cutout: '60%',
-                plugins: {{
-                    ...chartOptions.plugins,
-                    tooltip: {{
-                        callbacks: {{
-                            label: function(context) {{
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((context.raw / total) * 100).toFixed(1);
-                                return context.label + ': ' + context.raw + ' files (' + percentage + '%)';
-                            }}
-                        }}
-                    }}
+        const languageConfig = {language_config};
+        const languagePlot = document.getElementById('languageChart');
+        
+        Plotly.newPlot(
+            languagePlot, 
+            [{
+                labels: languageConfig.labels,
+                values: languageConfig.values,
+                type: 'pie',
+                hole: 0.6,
+                marker: {{
+                    colors: languageConfig.colors
+                }},
+                textinfo: 'label+percent',
+                hovertemplate: '%{label}: %{value} files (%{percent})<extra></extra>',
+                textposition: 'outside'
+            }], 
+            {{
+                margin: {{t: 10, b: 10, l: 10, r: 10}},
+                showlegend: true,
+                legend: {{
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: -0.2,
+                    xanchor: 'center',
+                    x: 0.5
                 }}
-            }}
-        }});
+            }}, 
+            {{responsive: true, displayModeBar: false}}
+        );
         
         // Complexity Distribution Chart
-        const complexityCtx = document.getElementById('complexityChart').getContext('2d');
-        new Chart(complexityCtx, {{
-            type: 'bar',
-            data: {{
-                labels: {self._complexity_labels_json},
-                datasets: [{{
-                    label: 'Number of Files',
-                    data: {self._complexity_data_json},
-                    backgroundColor: [
-                        '#10b981', '#22c55e', '#f59e0b', '#f97316', '#ef4444', '#dc2626'
-                    ],
-                    borderRadius: 6,
-                    borderSkipped: false,
-                }}]
-            }},
-            options: {{
-                ...chartOptions,
-                plugins: {{
-                    ...chartOptions.plugins,
-                    legend: {{
-                        display: false
-                    }}
+        const complexityConfig = {complexity_config};
+        const complexityPlot = document.getElementById('complexityChart');
+        
+        Plotly.newPlot(
+            complexityPlot, 
+            [{
+                x: complexityConfig.labels,
+                y: complexityConfig.values,
+                type: 'bar',
+                marker: {{
+                    color: complexityConfig.colors
                 }},
-                scales: {{
-                    x: {{
-                        grid: {{
-                            display: false
-                        }},
-                        ticks: {{
-                            font: {{
-                                size: 11
-                            }}
-                        }}
-                    }},
-                    y: {{
-                        beginAtZero: true,
-                        grid: {{
-                            color: '#f3f4f6'
-                        }},
-                        ticks: {{
-                            font: {{
-                                size: 11
-                            }}
-                        }}
-                    }}
+                hovertemplate: '%{x}: %{y} files<extra></extra>',
+            }], 
+            {{
+                margin: {{t: 10, r: 10, l: 40, b: 40}},
+                xaxis: {{
+                    title: '',
+                    tickangle: 0
+                }},
+                yaxis: {{
+                    title: 'Number of Files',
+                    gridcolor: '#f3f4f6'
                 }}
-            }}
-        }});'''
+            }}, 
+            {{responsive: true, displayModeBar: false}}
+        );'''
 
 
 class HTMLReportGenerator:
@@ -267,7 +233,7 @@ class HTMLReportGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Codebase Analysis Report</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         {self._get_css_styles()}
@@ -475,7 +441,7 @@ class HTMLReportGenerator:
 
         .chart-wrapper {
             position: relative;
-            height: 300px;
+            height: 400px;
             width: 100%;
         }
 
