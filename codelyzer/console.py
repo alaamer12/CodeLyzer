@@ -2,8 +2,9 @@
 Console and display utilities for CodeLyzer.
 Centralizes all console output, logging, progress bars, and rich display components.
 """
+from ast import Dict
 from pathlib import Path
-from typing import List
+from typing import Any, List
 
 from rich import box
 from rich.console import Console
@@ -12,6 +13,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.table import Table
+from rich.box import Box
 
 from codelyzer.metrics import ProjectMetrics, ComplexityLevel
 
@@ -111,46 +113,72 @@ def create_complexity_table(metrics: ProjectMetrics) -> Table:
 
     return table
 
+def create_table(title: str, box: Box, title_style: str, border_style: str, highlight: bool) -> Table:
+    """Create a table with the given parameters."""
+    return Table(
+        title=title,
+        box=box,
+        title_style=title_style,
+        border_style=border_style,
+        highlight=highlight
+    )
+
+def create_table_columns(table: Table, columns: Dict[str, Dict[str, Any]]) -> Table:
+    """Update a table with the given columns."""
+    for column_name, column_config in columns.items():
+        table.add_column(column_name, **column_config)
+    return table
 
 def create_hotspots_table(metrics: ProjectMetrics) -> Table:
     """Create a table showing code hotspots (most complex files)."""
-    table = Table(
+    table = create_table(
         title="🔥 Code Hotspots (Most Complex Files)",
         box=box.ROUNDED,
         title_style="bold blue",
         border_style="cyan",
         highlight=True
     )
-    table.add_column("File", style="cyan", max_width=50)
-    table.add_column("Lines", justify="right", style="magenta")
-    table.add_column("Complexity", justify="right", style="red")
-    table.add_column("Issues", justify="right", style="yellow")
+    columns = {
+        "file": {"style": "cyan", "max_width": 50},
+        "lines": {"justify": "right", "style": "magenta"},
+        "complexity": {"justify": "right", "style": "red"},
+        "issues": {"justify": "right", "style": "yellow"}
+    }
+    create_table_columns(table, columns)
 
-    for file_metrics in metrics.most_complex_files[:10]:
-        # Handle paths on different drives by using Path
-        try:
-            # Try relative path first
-            relative_path = str(Path(file_metrics.file_path).relative_to(Path.cwd()))
-        except ValueError:
-            # If on a different drive, just use the basename or full path
-            path_obj = Path(file_metrics.file_path)
-            # Use parent directory + filename for better context
-            if path_obj.parent.name:
-                relative_path = str(Path(path_obj.parent.name) / path_obj.name)
-            else:
-                relative_path = path_obj.name
+    # Create a mapping of file paths to file metrics for quick lookup
+    file_metrics_map = {fm.file_path: fm for fm in metrics.file_metrics}
+    
+    # Loop through the most complex file paths and find their corresponding FileMetrics objects
+    for file_path in metrics.most_complex_files[:10]:
+        # Get the FileMetrics object for this file path
+        file_metrics = file_metrics_map.get(file_path)
+        
+        if file_metrics:
+            # Handle paths on different drives by using Path
+            try:
+                # Try relative path first
+                relative_path = str(Path(file_metrics.file_path).relative_to(Path.cwd()))
+            except ValueError:
+                # If on a different drive, just use the basename or full path
+                path_obj = Path(file_metrics.file_path)
+                # Use parent directory + filename for better context
+                if path_obj.parent.name:
+                    relative_path = str(Path(path_obj.parent.name) / path_obj.name)
+                else:
+                    relative_path = path_obj.name
 
-        issues = len(file_metrics.security_issues) + len(file_metrics.code_smells)
+            issues = len(file_metrics.security_issues) + len(file_metrics.code_smells_list)
 
-        # Color code based on issue count
-        issue_style = "green" if issues == 0 else "yellow" if issues < 3 else "red"
+            # Color code based on issue count
+            issue_style = "green" if issues == 0 else "yellow" if issues < 3 else "red"
 
-        table.add_row(
-            relative_path,
-            str(file_metrics.sloc),
-            f"{file_metrics.complexity_score:.0f}",
-            f"[{issue_style}]{issues if issues > 0 else '✅'}[/{issue_style}]"
-        )
+            table.add_row(
+                relative_path,
+                str(file_metrics.sloc),
+                f"{file_metrics.complexity_score:.0f}",
+                f"[{issue_style}]{issues if issues > 0 else '✅'}[/{issue_style}]"
+            )
 
     return table
 
@@ -281,10 +309,11 @@ def display_security_issues(metrics: ProjectMetrics) -> None:
         security_counts = Counter()
         for file_metrics in metrics.file_metrics:
             for issue in file_metrics.security_issues:
-                security_counts[issue] += 1
+                issue_type = issue.get('type', 'unknown')
+                security_counts[issue_type] += 1
 
-        for issue, count in security_counts.most_common():
-            security_table.add_row(issue.replace('_', ' ').title(), str(count))
+        for issue_type, count in security_counts.most_common():
+            security_table.add_row(issue_type.replace('_', ' ').title(), str(count))
 
         console.print(security_table)
         console.print()
