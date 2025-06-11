@@ -14,14 +14,28 @@ import pandas as pd
 from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
 from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, FileMetrics, ProjectMetrics, TIMEOUT_SECONDS
 from codelyzer.console import console, create_analysis_progress_bar
-from codelyzer.helpers import StandardFileDiscovery, SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
-    PatternBasedAnalyzer, ProjectMetricsProcessor, Scoring
+from codelyzer.analyzers import SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
+    PatternBasedAnalyzer
+from codelyzer.helpers import StandardFileDiscovery, ProjectMetricsProcessor, Scoring
 from codelyzer.utils import FunctionWithTimeout
+
+
+def register_metric_providers() -> None:
+    """Register all metric providers to the ASTAnalyzer base class"""
+    
+    # Register each provider
+    ASTAnalyzer.register_metric_provider(SecurityAnalyzer())
+    ASTAnalyzer.register_metric_provider(ComplexityAnalyzer())
+    ASTAnalyzer.register_metric_provider(CodeSmellAnalyzer())
+    ASTAnalyzer.register_metric_provider(PatternBasedAnalyzer())
 
 
 def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
     """Initialize analyzers for different languages (strategy pattern)"""
     analyzers = {}
+
+    # Register metric providers (once for all analyzers)
+    register_metric_providers()
 
     # Add Python analyzer
     python_analyzer = PythonASTAnalyzer()
@@ -40,6 +54,7 @@ def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
     # analyzers['java'] = JavaASTAnalyzer()
 
     return analyzers
+
 
 
 def get_file_size(file_path: str) -> int:

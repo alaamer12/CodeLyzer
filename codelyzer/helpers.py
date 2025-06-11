@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import math
 import os
-import re
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Protocol, Union
+from typing import Dict, List, Optional, Set, Protocol
 
-from codelyzer.config import DEFAULT_EXCLUDED_FILES, FileMetrics, ProjectMetrics, ComplexityLevel, FILE_SIZE_LIMIT, \
-    TIMEOUT_SECONDS
-from codelyzer.console import console
-from codelyzer.utils import FunctionWithTimeout
+from codelyzer.config import DEFAULT_EXCLUDED_FILES, FileMetrics, ProjectMetrics, ComplexityLevel, SecurityLevel
 
 
 class FileDiscovery(Protocol):
@@ -100,240 +95,6 @@ class StandardFileDiscovery:
         languages = self.language_detectors.get(ext, [])
         return languages[0] if languages else None
 
-
-class SecurityAnalyzer:
-    """Analyzes code for security vulnerabilities"""
-
-    def __init__(self):
-        self.security_patterns = self._build_security_patterns()
-
-    @staticmethod
-    def _build_security_patterns() -> Dict[str, List[str]]:
-        """Build security vulnerability patterns"""
-        return {
-            'sql_injection': [
-                r'(?i)execute\s*\(\s*["\'].*%.*["\']',
-                r'(?i)query\s*\(\s*["\'].*\+.*["\']',
-                r'(?i)cursor\.execute\s*\([^,)]*%',
-            ],
-            'xss': [
-                r'(?i)innerHTML\s*=\s*.*\+',
-                r'(?i)document\.write\s*\(',
-                r'(?i)eval\s*\(',
-            ],
-            'hardcoded_secrets': [
-                r'(?i)(password|pwd|secret|key)\s*=\s*["\'][^"\']{8,}["\']',
-                r'(?i)(api_key|apikey|access_key)\s*=\s*["\'][^"\']{20,}["\']',
-                r'(?i)(token|auth)\s*=\s*["\'][^"\']{30,}["\']',
-            ],
-            'unsafe_deserialization': [
-                r'(?i)pickle\.load',
-                r'(?i)yaml\.load\(',
-                r'(?i)json\.loads.*input',
-            ]
-        }
-
-    def analyze(self, file_path: str, content: str, metrics: FileMetrics) -> None:
-        """Analyze code for security issues"""
-        if not content:
-            return
-
-        security_issues = []
-
-        # Check security patterns
-        for category, patterns in self.security_patterns.items():
-            for pattern in patterns:
-                if re.search(pattern, content, re.MULTILINE | re.IGNORECASE):
-                    security_issues.append(category)
-                    break
-
-        metrics.security_issues = security_issues
-
-
-class CodeSmellAnalyzer:
-    """Analyzes code for code smells"""
-
-    def __init__(self):
-        self.code_smell_patterns = self._build_code_smell_patterns()
-
-    @staticmethod
-    def _build_code_smell_patterns() -> dict[str, str]:
-        """Build code smell patterns"""
-        return {
-            'long_methods': r'def\s+\w+.*:\s*\n(?:\s+.*\n){50,}',
-            'duplicate_code': r'(.{50,})\n(?:.*\n)*?\1',
-            'magic_numbers': r'\b(?<![\w.])\d{3,}\b(?![\w.])',
-            'god_class': r'class\s+\w+.*:\s*\n(?:\s+.*\n){200,}',
-            'feature_envy': r'(\w+)\.(\w+)\.(\w+)\.(\w+)',
-        }
-
-    def analyze(self, file_path: str, content: str, metrics: FileMetrics) -> None:
-        """Analyze code for code smells"""
-        if not content:
-            return
-
-        code_smells = []
-
-        # Check code smell patterns
-        for smell, pattern in self.code_smell_patterns.items():
-            if re.search(pattern, content, re.MULTILINE):
-                code_smells.append(smell)
-
-        metrics.code_smells = code_smells
-
-
-class ComplexityAnalyzer:
-    """Analyzes code complexity"""
-
-    def __init__(self, language_configs: Dict):
-        self.language_configs = language_configs
-
-    def analyze(self, file_path: str, content: str, metrics: FileMetrics) -> None:
-        """Calculate complexity metrics"""
-        if metrics.sloc == 0:
-            return
-
-        # Get complexity weights for the language
-        config = self.language_configs.get(metrics.language, self.language_configs['python'])
-        weights = config['complexity_weights']
-
-        # Calculate complexity score
-        metrics.complexity_score = (
-                metrics.sloc * weights['loc'] +
-                metrics.classes * weights['classes'] +
-                metrics.functions * weights['functions'] +
-                metrics.methods * weights['methods']
-        )
-
-        # Maintainability index (simplified)
-        if metrics.sloc > 0:
-            metrics.maintainability_index = max(0.0, 171 - 5.2 * math.log(metrics.sloc) -
-                                                0.23 * (metrics.cyclomatic_complexity or 1) -
-                                                16.2 * math.log(max(1, len(metrics.imports or []))))
-
-
-class PatternBasedAnalyzer:
-    """Generic pattern-based analyzer for languages without specialized analyzers"""
-
-    def __init__(self, language_configs: Dict):
-        self.language_configs = language_configs
-
-    def analyze_file(self, file_path: str, language: str) -> Union[FileMetrics, tuple[FileMetrics, Optional[str]]]:
-        """Analyze a file using pattern matching"""
-        try:
-            metrics = self._initialize_metrics(file_path, language)
-            
-            # Check file size first to avoid hanging on massive files
-            if self._is_file_too_large(file_path):
-                return self._create_metrics_for_large_file(metrics, file_path)
-            
-            content = self._read_file_content(file_path)
-            if content is None:
-                return metrics
-            
-            config = self._get_language_config(language)
-            
-            # Pattern matching with thread-based timeout
-            patterns_result = self._perform_pattern_matching(content, config, metrics)
-            
-            if isinstance(patterns_result, (TimeoutError, Exception)):
-                return self._handle_pattern_matching_failure(metrics, content)
-            
-            # Count lines and categorize them
-            self._calculate_line_counts(content, metrics, config)
-            
-            return metrics, content
-            
-        except Exception as e:
-            return self._handle_analysis_error(file_path, language, e)
-    
-    def _initialize_metrics(self, file_path: str, language: str) -> FileMetrics:
-        """Initialize metrics object for a file"""
-        return FileMetrics(file_path=file_path, language=language)
-    
-    def _is_file_too_large(self, file_path: str) -> bool:
-        """Check if file exceeds the size limit"""
-        file_size = os.path.getsize(file_path)
-        return file_size > FILE_SIZE_LIMIT
-    
-    def _create_metrics_for_large_file(self, metrics: FileMetrics, file_path: str) -> FileMetrics:
-        """Create metrics for files that are too large to process normally"""
-        file_size = os.path.getsize(file_path)
-        metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
-        return metrics
-    
-    def _read_file_content(self, file_path: str) -> Optional[str]:
-        """Read file content with error handling"""
-        try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return f.read()
-        except Exception:
-            return None
-    
-    def _get_language_config(self, language: str) -> Dict:
-        """Get configuration for the specified language"""
-        return self.language_configs.get(language, self.language_configs['python'])
-    
-    def _perform_pattern_matching(self, content: str, config: Dict, metrics: FileMetrics) -> Any:
-        """Perform pattern matching with timeout protection"""
-        def pattern_matching():
-            try:
-                patterns_found = 0
-                for keyword in config['keywords']:
-                    pattern = rf'\b{keyword}\b'
-                    matches = re.findall(pattern, content, re.IGNORECASE)
-                    patterns_found += len(matches)
-                    
-                    if keyword in ['def', 'function', 'func', 'fn']:
-                        metrics.functions += len(matches)
-                    elif keyword in ['class', 'struct', 'interface']:
-                        metrics.classes += len(matches)
-                return patterns_found
-            except Exception:
-                return 0
-        
-        timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
-        return timeout_runner.run_with_timeout(pattern_matching)
-    
-    def _handle_pattern_matching_failure(self, metrics: FileMetrics, content: str) -> FileMetrics:
-        """Handle timeout or exception in pattern matching"""
-        try:
-            lines = content.count('\n') + 1
-            metrics.loc = metrics.sloc = lines
-        except Exception:
-            metrics.loc = metrics.sloc = 0
-        return metrics
-    
-    def _handle_analysis_error(self, file_path: str, language: str, error: Exception) -> tuple[FileMetrics, Optional[str]]:
-        """Handle exceptions during file analysis"""
-        console.print(f"[yellow]Warning: Generic analysis failed for {file_path}: {str(error)}[/yellow]")
-        metrics = FileMetrics(file_path=file_path, language=language)
-        metrics.loc = metrics.sloc = 0
-        return metrics, None
-
-    @staticmethod
-    def _calculate_line_counts(content: str, metrics: FileMetrics, config: Dict) -> None:
-        """Count different types of lines"""
-        if not content:
-            metrics.loc = metrics.sloc = metrics.blanks = metrics.comments = 0
-            return
-
-        lines = content.split('\n')
-        metrics.loc = len(lines)
-        metrics.blanks = sum(1 for line in lines if not line.strip())
-
-        # Count comment lines based on language patterns
-        comment_lines = 0
-        comment_patterns = [re.compile(pattern) for pattern in config['comment_patterns']]
-        for line in lines:
-            stripped = line.strip()
-            if any(pattern.match(stripped) for pattern in comment_patterns):
-                comment_lines += 1
-
-        metrics.comments = comment_lines
-        metrics.sloc = metrics.loc - metrics.blanks - metrics.comments
-
-
 class ProjectMetricsProcessor:
     """Processes project metrics to calculate derived metrics"""
 
@@ -361,17 +122,29 @@ class Scoring:
     """Class for handling code scoring and metrics aggregation"""
 
     @staticmethod
-    def update_aggregate_metrics(project_metrics: ProjectMetrics, metrics: FileMetrics) -> ProjectMetrics:
+    def update_aggregate_metrics(project_metrics: ProjectMetrics, file_metrics: FileMetrics) -> ProjectMetrics:
         """Update aggregate metrics"""
-        project_metrics.total_files += 1
-        project_metrics.total_loc += metrics.loc or 0
-        project_metrics.total_sloc += metrics.sloc or 0
-        project_metrics.total_comments += metrics.comments or 0
-        project_metrics.total_blanks += metrics.blanks or 0
-        project_metrics.total_classes += metrics.classes or 0
-        project_metrics.total_functions += metrics.functions or 0
-        project_metrics.total_methods += metrics.methods or 0
-        project_metrics.project_size += metrics.file_size or 0
+        # Update base metrics
+        project_metrics.base.total_files += 1
+        project_metrics.base.total_loc += file_metrics.loc or 0
+        project_metrics.base.total_sloc += file_metrics.sloc or 0
+        project_metrics.base.total_comments += file_metrics.comments or 0
+        project_metrics.base.total_blanks += file_metrics.blanks or 0
+        project_metrics.base.project_size += file_metrics.file_size or 0
+        
+        # Update language statistics
+        lang = file_metrics.language
+        project_metrics.base.languages[lang] = project_metrics.base.languages.get(lang, 0) + 1
+        
+        # Update structure metrics
+        project_metrics.structure.total_classes += file_metrics.classes or 0
+        project_metrics.structure.total_functions += file_metrics.functions or 0
+        project_metrics.structure.total_methods += file_metrics.methods or 0
+        
+        # Track dependencies
+        for imp in file_metrics.imports:
+            project_metrics.structure.dependencies[imp] = project_metrics.structure.dependencies.get(imp, 0) + 1
+        
         return project_metrics
     
     @staticmethod
@@ -379,7 +152,7 @@ class Scoring:
         """Calculate complexity distribution across files"""
         for file_metrics in metrics.file_metrics:
             level = Scoring.determine_complexity_level(file_metrics.complexity_score)
-            metrics.complexity_distribution[level] = metrics.complexity_distribution.get(level, 0) + 1
+            metrics.complexity.complexity_distribution[level] = metrics.complexity.complexity_distribution.get(level, 0) + 1
 
     @staticmethod
     def determine_complexity_level(score: float) -> ComplexityLevel:
@@ -403,12 +176,72 @@ class Scoring:
         if metrics.total_sloc <= 0:
             return
 
-        # Code quality score
-        metrics.code_quality_score = min(100, max(0,
-                                                  int(100 - (sum(len(f.security_issues) + len(f.code_smells)
-                                                                 for f in
-                                                                 metrics.file_metrics) / metrics.total_files * 10))))
+        # Calculate security score
+        security_issues = sum(len(file_metrics.security_issues) for file_metrics in metrics.file_metrics)
+        if security_issues > 0:
+            metrics.security.security_score = max(0, 100 - (security_issues / metrics.total_files * 20))
+        
+        # Calculate code quality score (based on code smells and security issues)
+        total_issues = sum(len(file_metrics.security_issues) + len(file_metrics.code_smells_list) 
+                           for file_metrics in metrics.file_metrics)
+        if total_issues > 0:
+            metrics.code_quality.code_quality_score = max(0, min(100, int(100 - (total_issues / metrics.total_files * 10))))
+        else:
+            metrics.code_quality.code_quality_score = 100
 
-        # Maintainability score
-        avg_maintainability = sum(f.maintainability_index for f in metrics.file_metrics) / len(metrics.file_metrics)
-        metrics.maintainability_score = max(0, min(100, int(avg_maintainability)))
+        # Calculate maintainability score
+        valid_files = [f for f in metrics.file_metrics if hasattr(f.complexity, 'maintainability_index') and f.complexity.maintainability_index > 0]
+        if valid_files:
+            avg_maintainability = sum(f.maintainability_index for f in valid_files) / len(valid_files)
+            metrics.complexity.maintainability_score = max(0, min(100, int(avg_maintainability)))
+            metrics.complexity.avg_maintainability_index = avg_maintainability
+        
+        # Calculate average cyclomatic complexity
+        valid_cc_files = [f for f in metrics.file_metrics if f.cyclomatic_complexity > 0]
+        if valid_cc_files:
+            metrics.complexity.avg_cyclomatic_complexity = sum(f.cyclomatic_complexity for f in valid_cc_files) / len(valid_cc_files)
+    
+    @staticmethod
+    def identify_hotspots(metrics: ProjectMetrics) -> None:
+        """Identify code hotspots based on complexity and issues"""
+        # Sort files by complexity
+        sorted_by_complexity = sorted(metrics.file_metrics, key=lambda f: f.complexity_score, reverse=True)
+        
+        # Get most complex files
+        metrics.complexity.most_complex_files = [f.file_path for f in sorted_by_complexity[:10]]
+        
+        # Get largest files
+        sorted_by_size = sorted(metrics.file_metrics, key=lambda f: f.file_size, reverse=True)
+        metrics.code_quality.largest_files = [f.file_path for f in sorted_by_size[:10]]
+        
+        # Identify hotspots (complex + security issues or code smells)
+        hotspots = []
+        for file_metrics in metrics.file_metrics:
+            if (file_metrics.complexity_score > 200 and 
+                (len(file_metrics.security_issues) > 0 or len(file_metrics.code_smells_list) > 0)):
+                hotspots.append(file_metrics.file_path)
+        metrics.code_quality.hotspots = hotspots[:10]  # Top 10 hotspots
+    
+    @staticmethod
+    def calculate_security_summary(metrics: ProjectMetrics) -> None:
+        """Calculate security summary statistics"""
+        for file_metrics in metrics.file_metrics:
+            for issue in file_metrics.security_issues:
+                level = issue.get('level', SecurityLevel.MEDIUM_RISK)
+                metrics.security.security_summary[level] = metrics.security.security_summary.get(level, 0) + 1
+                
+                # Track critical vulnerabilities
+                if level == SecurityLevel.CRITICAL:
+                    metrics.security.critical_vulnerabilities.append({
+                        'file': file_metrics.file_path,
+                        'issue': issue
+                    })
+    
+    @staticmethod
+    def process_metrics(project_metrics: ProjectMetrics) -> ProjectMetrics:
+        """Process all metrics and calculate derived values"""
+        Scoring.calculate_complexity_distribution(project_metrics)
+        Scoring.calculate_quality_scores(project_metrics)
+        Scoring.identify_hotspots(project_metrics)
+        Scoring.calculate_security_summary(project_metrics)
+        return project_metrics
