@@ -6,13 +6,16 @@ from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider, Secur
 class SecurityAnalyzer(MetricProvider):
     """Analyzer for identifying security issues in code"""
 
+
     def provide_file_metrics(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Analyze file for security issues and update metrics"""
         language = file_metrics.language
 
+
         # Skip if content is empty
         if not file_content:
             return
+
 
         # Analyze based on language
         if language == "python":
@@ -21,10 +24,12 @@ class SecurityAnalyzer(MetricProvider):
             self._analyze_js_security(file_metrics, file_content, ast_data)
         # Add other languages as needed
 
+
     def provide_project_metrics(self, project_metrics: ProjectMetrics) -> None:
         """Analyze project-level security metrics"""
         # Aggregate vulnerabilities by type
         vulnerability_types = {}
+
 
         for file_metrics in project_metrics.file_metrics:
             for vuln in file_metrics.security_issues:
@@ -33,8 +38,10 @@ class SecurityAnalyzer(MetricProvider):
                     vulnerability_types[vuln_type] = 0
                 vulnerability_types[vuln_type] += 1
 
+
         # Add aggregated data to project metrics
         project_metrics.security.vulnerability_types = vulnerability_types
+
 
     def _analyze_python_security(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Analyze Python code for security issues"""
@@ -44,6 +51,7 @@ class SecurityAnalyzer(MetricProvider):
         self._check_for_insecure_deserialization(file_metrics, file_content)
         self._check_for_hardcoded_secrets(file_metrics, file_content)
 
+
     def _analyze_js_security(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Analyze JavaScript/TypeScript code for security issues"""
         # Check for common JavaScript security issues
@@ -51,6 +59,7 @@ class SecurityAnalyzer(MetricProvider):
         self._check_for_document_write(file_metrics, file_content)
         self._check_for_innerhtml(file_metrics, file_content)
         self._check_for_hardcoded_secrets(file_metrics, file_content)
+
 
     def _check_for_os_command_injection(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for OS command injection vulnerabilities"""
@@ -60,6 +69,7 @@ class SecurityAnalyzer(MetricProvider):
             r"subprocess\.Popen\((?!['\"]\w+['\"])[^\)]*\)",
             r"eval\([^\)]*\)"
         ]
+
 
         for pattern in patterns:
             import re
@@ -74,6 +84,7 @@ class SecurityAnalyzer(MetricProvider):
                     SecurityLevel.HIGH_RISK
                 )
 
+
     def _check_for_sql_injection(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for SQL injection vulnerabilities"""
         patterns = [
@@ -82,6 +93,7 @@ class SecurityAnalyzer(MetricProvider):
             r"execute\([^,]*f['\"][^'\"]*{[^}]*}[^'\"]*['\"]",
             r"cursor\.execute\([^,]*\+[^\)]*\)"
         ]
+
 
         for pattern in patterns:
             import re
@@ -95,6 +107,7 @@ class SecurityAnalyzer(MetricProvider):
                     location,
                     SecurityLevel.CRITICAL
                 )
+
 
     def _check_for_eval(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for unsafe eval() usage in JavaScript"""
@@ -111,6 +124,7 @@ class SecurityAnalyzer(MetricProvider):
                 SecurityLevel.HIGH_RISK
             )
 
+
     def _check_for_document_write(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for unsafe document.write usage in JavaScript"""
         pattern = r"document\.write\([^\)]+\)"
@@ -125,6 +139,7 @@ class SecurityAnalyzer(MetricProvider):
                 location,
                 SecurityLevel.MEDIUM_RISK
             )
+
 
     def _check_for_innerhtml(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for unsafe innerHTML usage in JavaScript"""
@@ -141,6 +156,7 @@ class SecurityAnalyzer(MetricProvider):
                 SecurityLevel.MEDIUM_RISK
             )
 
+
     def _check_for_insecure_deserialization(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for insecure deserialization"""
         patterns = [
@@ -149,6 +165,7 @@ class SecurityAnalyzer(MetricProvider):
             r"yaml\.load\([^,)]*\)",  # Missing safe_load
             r"marshal\.loads\("
         ]
+
 
         for pattern in patterns:
             import re
@@ -163,6 +180,7 @@ class SecurityAnalyzer(MetricProvider):
                     SecurityLevel.HIGH_RISK
                 )
 
+
     def _check_for_hardcoded_secrets(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for hardcoded secrets in code"""
         patterns = [
@@ -172,6 +190,7 @@ class SecurityAnalyzer(MetricProvider):
             r"token\s*=\s*['\"][^'\"]+['\"]"
         ]
 
+
         for pattern in patterns:
             import re
             matches = re.finditer(pattern, file_content, re.IGNORECASE)
@@ -179,6 +198,7 @@ class SecurityAnalyzer(MetricProvider):
                 # Ignore if it looks like an environment variable
                 if "os.environ" in match.group(0) or "process.env" in match.group(0):
                     continue
+
 
                 location = self._get_line_number(file_content, match.start())
                 self._add_vulnerability(
@@ -201,7 +221,14 @@ class SecurityAnalyzer(MetricProvider):
             'position': position
         }
 
+
     def _add_vulnerability(
+            self,
+            file_metrics: FileMetrics,
+            vuln_type: str,
+            message: str,
+            location: Dict,
+            level: SecurityLevel = SecurityLevel.MEDIUM_RISK
             self,
             file_metrics: FileMetrics,
             vuln_type: str,
@@ -218,7 +245,9 @@ class SecurityAnalyzer(MetricProvider):
             'severity': self._level_to_severity(level)
         }
 
+
         file_metrics.security.vulnerabilities.append(vulnerability)
+
 
         # Adjust security score based on severity
         if level == SecurityLevel.CRITICAL:
@@ -244,4 +273,6 @@ class SecurityAnalyzer(MetricProvider):
         elif level == SecurityLevel.LOW_RISK:
             return "low"
         else:
+            return "info"
+
             return "info"

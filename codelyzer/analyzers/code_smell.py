@@ -6,13 +6,16 @@ from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider, CodeS
 class CodeSmellAnalyzer(MetricProvider):
     """Analyzer for identifying code smells in projects"""
 
+
     def provide_file_metrics(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Analyze file for code smells"""
         language = file_metrics.language
 
+
         # Skip if content is empty
         if not file_content:
             return
+
 
         # Run common code smell detections
         self._check_file_length(file_metrics, file_content)
@@ -20,19 +23,23 @@ class CodeSmellAnalyzer(MetricProvider):
         self._check_commented_code(file_metrics, file_content, language)
         self._check_duplicate_code(file_metrics, file_content)
 
+
         # Language-specific smells
         if language == "python":
             self._check_python_smells(file_metrics, file_content, ast_data)
         elif language in ("javascript", "typescript", "jsx"):
             self._check_js_smells(file_metrics, file_content, ast_data)
 
+
         # Calculate technical debt ratio based on code smells
         self._calculate_technical_debt(file_metrics)
+
 
     def provide_project_metrics(self, project_metrics: ProjectMetrics) -> None:
         """Analyze project-level code smell metrics"""
         # Aggregate duplicate code blocks across the project
         self._detect_project_duplications(project_metrics)
+
 
         # Calculate project-level metrics
         smell_counts = {}
@@ -43,18 +50,22 @@ class CodeSmellAnalyzer(MetricProvider):
                     smell_counts[smell_type] = 0
                 smell_counts[smell_type] += 1
 
+
         # Add to project metrics
         project_metrics.code_quality.smell_counts = smell_counts
+
 
         # Calculate duplicated lines ratio
         total_duplicated = sum(f.duplicated_lines for f in project_metrics.file_metrics)
         if project_metrics.total_sloc > 0:
             project_metrics.code_quality.duplicated_lines_ratio = total_duplicated / project_metrics.total_sloc
 
+
     def _check_file_length(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check if file is too long"""
         lines = file_content.split('\n')
         line_count = len(lines)
+
 
         if line_count > 1000:
             self._add_code_smell(
@@ -73,9 +84,11 @@ class CodeSmellAnalyzer(MetricProvider):
                 CodeSmellSeverity.MINOR
             )
 
+
     def _check_function_length(self, file_metrics: FileMetrics, file_content: str, language: str) -> None:
         """Check for overly long functions/methods"""
         import re
+
 
         # Language-specific function detection
         if language == "python":
@@ -83,20 +96,24 @@ class CodeSmellAnalyzer(MetricProvider):
             func_pattern = r"def\s+(\w+)\s*\("
             functions = re.finditer(func_pattern, file_content)
 
+
             for match in functions:
                 # Get function name and position
                 func_name = match.group(1)
                 func_start = match.start()
+
 
                 # Find function body by indentation
                 lines = file_content[func_start:].split('\n')
                 line_count = 0
                 in_function = False
 
+
                 for i, line in enumerate(lines):
                     if i == 0:  # Function definition line
                         in_function = True
                         continue
+
 
                     if in_function:
                         stripped = line.strip()
@@ -106,6 +123,7 @@ class CodeSmellAnalyzer(MetricProvider):
                             if indent == 0:  # No indentation means out of function
                                 break
                             line_count += 1
+
 
                 # Check function length
                 if line_count > 50:
@@ -127,6 +145,7 @@ class CodeSmellAnalyzer(MetricProvider):
                         CodeSmellSeverity.MINOR
                     )
 
+
         elif language in ("javascript", "typescript", "jsx"):
             # Find JS function definitions (multiple formats)
             func_patterns = [
@@ -136,29 +155,36 @@ class CodeSmellAnalyzer(MetricProvider):
                 r"(\w+)\s*:\s*function\s*\([^)]*\)\s*{",  # name: function() {}
             ]
 
+
             for pattern in func_patterns:
                 functions = re.finditer(pattern, file_content)
+
 
                 for match in functions:
                     # Get function name and position
                     func_name = match.group(1)
                     func_start = match.start()
 
+
                     # Find function body by counting braces
                     lines = file_content[func_start:].split('\n')
                     brace_count = 0
                     line_count = 0
+
 
                     for i, line in enumerate(lines):
                         if i == 0:  # Function definition line
                             brace_count += line.count('{')
                             continue
 
+
                         brace_count += line.count('{') - line.count('}')
                         line_count += 1
 
+
                         if brace_count <= 0:
                             break
+
 
                     # Check function length
                     if line_count > 50:
@@ -180,6 +206,7 @@ class CodeSmellAnalyzer(MetricProvider):
                             CodeSmellSeverity.MINOR
                         )
 
+
     def _check_commented_code(self, file_metrics: FileMetrics, file_content: str, language: str) -> None:
         """Detect commented-out code blocks"""
         lines = file_content.split('\n')
@@ -190,22 +217,27 @@ class CodeSmellAnalyzer(MetricProvider):
             "jsx": "//"
         }
 
+
         marker = comment_markers.get(language, "#")
         code_indicators = [
             "if ", "for ", "while ", "def ", "class ", "function", "return ", "var ", "let ", "const "
         ]
+
 
         # Track consecutive commented lines
         comment_block = []
         for i, line in enumerate(lines):
             stripped = line.strip()
 
+
             # Check for comment line
             if stripped.startswith(marker):
                 comment_content = stripped[len(marker):].strip()
 
+
                 # Check if comment looks like code
                 if any(indicator in comment_content for indicator in code_indicators):
+                    comment_block.append((i + 1, comment_content))
                     comment_block.append((i + 1, comment_content))
                 else:
                     # Not code-like, reset block if only one line
@@ -224,6 +256,7 @@ class CodeSmellAnalyzer(MetricProvider):
                     )
                 comment_block = []
 
+
         # Check remaining block at end of file
         if len(comment_block) >= 3:
             start_line = comment_block[0][0]
@@ -235,19 +268,24 @@ class CodeSmellAnalyzer(MetricProvider):
                 CodeSmellSeverity.MINOR
             )
 
+
     def _check_duplicate_code(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for duplicate code within a file (simplified)"""
         lines = file_content.split('\n')
         duplicate_count = 0
         chunk_size = 6  # Minimum size of duplicate chunks to detect
 
+
         # Simplistic duplicate detection (can be replaced with more robust algorithm)
         chunks = {}
 
+
         for i in range(len(lines) - chunk_size + 1):
+            chunk = "\n".join(lines[i:i + chunk_size])
             chunk = "\n".join(lines[i:i + chunk_size])
             if len(chunk.strip()) < 30:  # Skip small chunks
                 continue
+
 
             if chunk in chunks:
                 # Found duplicate
@@ -255,15 +293,18 @@ class CodeSmellAnalyzer(MetricProvider):
                     duplicate_count += chunk_size
                     file_metrics.code_smells.duplicated_lines += chunk_size
 
+
                     # Report first occurrence
                     first_line = chunks[chunk] + 1
                     self._add_code_smell(
                         file_metrics,
                         "duplicate_code",
                         f"Duplicate code block (also at line {i + 1})",
+                        f"Duplicate code block (also at line {i + 1})",
                         {'line': first_line, 'column': 1},
                         CodeSmellSeverity.MINOR
                     )
+
 
                     # Report second occurrence
                     self._add_code_smell(
@@ -271,18 +312,23 @@ class CodeSmellAnalyzer(MetricProvider):
                         "duplicate_code",
                         f"Duplicate code block (also at line {first_line})",
                         {'line': i + 1, 'column': 1},
+                        {'line': i + 1, 'column': 1},
                         CodeSmellSeverity.MINOR
                     )
+
 
                     chunks[chunk] = -1  # Mark as counted
             else:
                 chunks[chunk] = i
 
+
         file_metrics.code_smells.duplicated_lines = duplicate_count
+
 
     def _check_python_smells(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Check for Python-specific code smells"""
         import re
+
 
         # Check for wildcard imports
         wildcard_pattern = r"from\s+\w+\s+import\s+\*"
@@ -297,6 +343,7 @@ class CodeSmellAnalyzer(MetricProvider):
                 CodeSmellSeverity.MINOR
             )
 
+
         # Check for excessive exception catching
         broad_except_pattern = r"except\s*:"
         matches = re.finditer(broad_except_pattern, file_content)
@@ -309,6 +356,7 @@ class CodeSmellAnalyzer(MetricProvider):
                 location,
                 CodeSmellSeverity.MAJOR
             )
+
 
         # Check for mutable default arguments
         mutable_defaults_pattern = r"def\s+\w+\s*\([^)]*=\s*(\[\]|\{\}|\(\)|\{\s*:\s*\}|\[\s*\]|\(\s*\))[^)]*\)"
@@ -323,9 +371,11 @@ class CodeSmellAnalyzer(MetricProvider):
                 CodeSmellSeverity.MAJOR
             )
 
+
     def _check_js_smells(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Check for JavaScript-specific code smells"""
         import re
+
 
         # Check for console.log statements
         console_pattern = r"console\.(log|warn|error|info|debug)\("
@@ -340,6 +390,7 @@ class CodeSmellAnalyzer(MetricProvider):
                 CodeSmellSeverity.MINOR
             )
 
+
         # Check for alert/prompt usage
         alert_pattern = r"\b(alert|prompt|confirm)\("
         matches = re.finditer(alert_pattern, file_content)
@@ -352,6 +403,7 @@ class CodeSmellAnalyzer(MetricProvider):
                 location,
                 CodeSmellSeverity.MINOR
             )
+
 
         # Check for == instead of ===
         equality_pattern = r"[^=!]=(?!=)[^=]"
@@ -373,6 +425,7 @@ class CodeSmellAnalyzer(MetricProvider):
         # For now, just aggregate file-level duplications
         duplicate_blocks = []
 
+
         # In a real implementation, we'd compare chunks across files
         # For now, just collect the duplicates already found
         for file_metrics in project_metrics.file_metrics:
@@ -381,6 +434,7 @@ class CodeSmellAnalyzer(MetricProvider):
                     'file': file_metrics.file_path,
                     'lines': file_metrics.duplicated_lines
                 })
+
 
         project_metrics.code_quality.duplicate_blocks = duplicate_blocks
 
@@ -393,6 +447,7 @@ class CodeSmellAnalyzer(MetricProvider):
             file_metrics.code_smells.technical_debt_ratio = 0.0
             return
 
+
         # Weight smells by severity
         debt_score = 0
         for smell in file_metrics.code_smells_list:
@@ -403,6 +458,7 @@ class CodeSmellAnalyzer(MetricProvider):
                 debt_score += 5
             else:  # minor
                 debt_score += 1
+
 
         # Calculate debt ratio (0.0 to 1.0, where higher is worse)
         file_metrics.code_smells.technical_debt_ratio = min(1.0, debt_score / (file_metrics.sloc or 1) * 0.02)
@@ -419,7 +475,14 @@ class CodeSmellAnalyzer(MetricProvider):
             'position': position
         }
 
+
     def _add_code_smell(
+            self,
+            file_metrics: FileMetrics,
+            smell_type: str,
+            message: str,
+            location: Dict,
+            severity: CodeSmellSeverity = CodeSmellSeverity.MINOR
             self,
             file_metrics: FileMetrics,
             smell_type: str,
@@ -435,6 +498,7 @@ class CodeSmellAnalyzer(MetricProvider):
             'severity': self._severity_to_string(severity)
         }
 
+
         file_metrics.code_smells.smells.append(smell)
 
     @staticmethod
@@ -447,4 +511,6 @@ class CodeSmellAnalyzer(MetricProvider):
         elif severity == CodeSmellSeverity.MINOR:
             return "minor"
         else:
+            return "none"
+
             return "none"
