@@ -221,63 +221,95 @@ class PatternBasedAnalyzer:
     def analyze_file(self, file_path: str, language: str) -> Union[FileMetrics, tuple[FileMetrics, Optional[str]]]:
         """Analyze a file using pattern matching"""
         try:
+            metrics = self._initialize_metrics(file_path, language)
+            
             # Check file size first to avoid hanging on massive files
-            file_size = os.path.getsize(file_path)
-            if file_size > FILE_SIZE_LIMIT:
-                metrics = FileMetrics(file_path=file_path, language=language)
-                metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
+            if self._is_file_too_large(file_path):
+                return self._create_metrics_for_large_file(metrics, file_path)
+            
+            content = self._read_file_content(file_path)
+            if content is None:
                 return metrics
-
-            metrics = FileMetrics(file_path=file_path, language=language)
-
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-            except Exception:
-                metrics.loc = metrics.sloc = 0
-                return metrics
-
-            config = self.language_configs.get(language, self.language_configs['python'])
-
+            
+            config = self._get_language_config(language)
+            
             # Pattern matching with thread-based timeout
-            def pattern_matching():
-                try:
-                    patterns_found = 0
-                    for keyword in config['keywords']:
-                        pattern = rf'\b{keyword}\b'
-                        matches = re.findall(pattern, content, re.IGNORECASE)
-                        patterns_found += len(matches)
-
-                        if keyword in ['def', 'function', 'func', 'fn']:
-                            metrics.functions += len(matches)
-                        elif keyword in ['class', 'struct', 'interface']:
-                            metrics.classes += len(matches)
-                    return patterns_found
-                except Exception:
-                    return 0
-
-            timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
-            result = timeout_runner.run_with_timeout(pattern_matching)
-
-            if isinstance(result, TimeoutError) or isinstance(result, Exception):
-                # Count lines as fallback
-                try:
-                    lines = content.count('\n') + 1
-                    metrics.loc = metrics.sloc = lines
-                except Exception:
-                    metrics.loc = metrics.sloc = 0
-                return metrics
-
+            patterns_result = self._perform_pattern_matching(content, config, metrics)
+            
+            if isinstance(patterns_result, (TimeoutError, Exception)):
+                return self._handle_pattern_matching_failure(metrics, content)
+            
             # Count lines and categorize them
             self._calculate_line_counts(content, metrics, config)
-
+            
             return metrics, content
-
+            
         except Exception as e:
-            console.print(f"[yellow]Warning: Generic analysis failed for {file_path}: {str(e)}[/yellow]")
-            metrics = FileMetrics(file_path=file_path, language=language)
+            return self._handle_analysis_error(file_path, language, e)
+    
+    def _initialize_metrics(self, file_path: str, language: str) -> FileMetrics:
+        """Initialize metrics object for a file"""
+        return FileMetrics(file_path=file_path, language=language)
+    
+    def _is_file_too_large(self, file_path: str) -> bool:
+        """Check if file exceeds the size limit"""
+        file_size = os.path.getsize(file_path)
+        return file_size > FILE_SIZE_LIMIT
+    
+    def _create_metrics_for_large_file(self, metrics: FileMetrics, file_path: str) -> FileMetrics:
+        """Create metrics for files that are too large to process normally"""
+        file_size = os.path.getsize(file_path)
+        metrics.loc = metrics.sloc = file_size // 100  # Rough estimate
+        return metrics
+    
+    def _read_file_content(self, file_path: str) -> Optional[str]:
+        """Read file content with error handling"""
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        except Exception:
+            return None
+    
+    def _get_language_config(self, language: str) -> Dict:
+        """Get configuration for the specified language"""
+        return self.language_configs.get(language, self.language_configs['python'])
+    
+    def _perform_pattern_matching(self, content: str, config: Dict, metrics: FileMetrics) -> Any:
+        """Perform pattern matching with timeout protection"""
+        def pattern_matching():
+            try:
+                patterns_found = 0
+                for keyword in config['keywords']:
+                    pattern = rf'\b{keyword}\b'
+                    matches = re.findall(pattern, content, re.IGNORECASE)
+                    patterns_found += len(matches)
+                    
+                    if keyword in ['def', 'function', 'func', 'fn']:
+                        metrics.functions += len(matches)
+                    elif keyword in ['class', 'struct', 'interface']:
+                        metrics.classes += len(matches)
+                return patterns_found
+            except Exception:
+                return 0
+        
+        timeout_runner = FunctionWithTimeout(timeout=TIMEOUT_SECONDS)
+        return timeout_runner.run_with_timeout(pattern_matching)
+    
+    def _handle_pattern_matching_failure(self, metrics: FileMetrics, content: str) -> FileMetrics:
+        """Handle timeout or exception in pattern matching"""
+        try:
+            lines = content.count('\n') + 1
+            metrics.loc = metrics.sloc = lines
+        except Exception:
             metrics.loc = metrics.sloc = 0
-            return metrics, None
+        return metrics
+    
+    def _handle_analysis_error(self, file_path: str, language: str, error: Exception) -> tuple[FileMetrics, Optional[str]]:
+        """Handle exceptions during file analysis"""
+        console.print(f"[yellow]Warning: Generic analysis failed for {file_path}: {str(error)}[/yellow]")
+        metrics = FileMetrics(file_path=file_path, language=language)
+        metrics.loc = metrics.sloc = 0
+        return metrics, None
 
     @staticmethod
     def _calculate_line_counts(content: str, metrics: FileMetrics, config: Dict) -> None:
