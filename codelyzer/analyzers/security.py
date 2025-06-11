@@ -6,7 +6,7 @@ from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider, Secur
 class SecurityAnalyzer(MetricProvider):
     """Analyzer for identifying security issues in code"""
 
-    def provide_file_metrics(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
+    def analyze_file(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Analyze file for security issues and update metrics"""
         language = file_metrics.language
 
@@ -21,7 +21,7 @@ class SecurityAnalyzer(MetricProvider):
             self._analyze_js_security(file_metrics, file_content, ast_data)
         # Add other languages as needed
 
-    def provide_project_metrics(self, project_metrics: ProjectMetrics) -> None:
+    def analyze_project(self, project_metrics: ProjectMetrics) -> None:
         """Analyze project-level security metrics"""
         # Aggregate vulnerabilities by type
         vulnerability_types = {}

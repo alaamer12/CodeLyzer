@@ -401,12 +401,12 @@ class MetricProvider(ABC):
     """Interface for classes that provide metrics"""
 
     @abstractmethod
-    def provide_file_metrics(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
+    def analyze_file(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Provide metrics for a file"""
         pass
 
     @abstractmethod
-    def provide_project_metrics(self, project_metrics: ProjectMetrics) -> None:
+    def analyze_project(self, project_metrics: ProjectMetrics) -> None:
         """Provide metrics for a project"""
         pass
 

@@ -6,7 +6,7 @@ from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider, CodeS
 class CodeSmellAnalyzer(MetricProvider):
     """Analyzer for identifying code smells in projects"""
 
-    def provide_file_metrics(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
+    def analyze_file(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Analyze file for code smells"""
         language = file_metrics.language
 
@@ -29,7 +29,7 @@ class CodeSmellAnalyzer(MetricProvider):
         # Calculate technical debt ratio based on code smells
         self._calculate_technical_debt(file_metrics)
 
-    def provide_project_metrics(self, project_metrics: ProjectMetrics) -> None:
+    def analyze_project(self, project_metrics: ProjectMetrics) -> None:
         """Analyze project-level code smell metrics"""
         # Aggregate duplicate code blocks across the project
         self._detect_project_duplications(project_metrics)

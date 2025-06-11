@@ -67,7 +67,7 @@ class ASTAnalyzer(ABC):
 
                 # Run all registered metric providers
                 for provider in self.metric_providers:
-                    provider.provide_file_metrics(metrics, content, ast_data)
+                    provider.analyze_file(metrics, content, ast_data)
 
             except Exception as e:
                 self._handle_metrics_calculation_error(metrics, content, e)

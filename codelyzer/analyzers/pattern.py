@@ -14,7 +14,7 @@ class PatternBasedAnalyzer(MetricProvider):
             "jsx": self._get_js_patterns()
         }
 
-    def provide_file_metrics(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
+    def analyze_file(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Analyze file for design patterns and anti-patterns"""
         language = file_metrics.language
 
@@ -34,7 +34,7 @@ class PatternBasedAnalyzer(MetricProvider):
                 for location in locations:
                     file_metrics.patterns.add_pattern(pattern_name, location)
 
-    def provide_project_metrics(self, project_metrics: ProjectMetrics) -> None:
+    def analyze_project(self, project_metrics: ProjectMetrics) -> None:
         """Analyze project-level pattern metrics"""
         # Aggregate patterns by type
         pattern_stats = {}

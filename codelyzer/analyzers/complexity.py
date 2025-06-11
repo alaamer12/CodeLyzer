@@ -7,7 +7,7 @@ from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider
 class ComplexityAnalyzer(MetricProvider):
     """Analyzer for calculating code complexity metrics"""
 
-    def provide_file_metrics(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
+    def analyze_file(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Calculate complexity metrics for a file"""
         language = file_metrics.language
 
@@ -46,7 +46,7 @@ class ComplexityAnalyzer(MetricProvider):
         file_metrics.complexity.add_metric("maintainability", mi)
         file_metrics.complexity.add_metric("halstead", halstead)
 
-    def provide_project_metrics(self, project_metrics: ProjectMetrics) -> None:
+    def analyze_project(self, project_metrics: ProjectMetrics) -> None:
         """Calculate project-level complexity metrics"""
         if not project_metrics.file_metrics:
             return
