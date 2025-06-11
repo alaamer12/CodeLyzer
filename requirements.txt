@@ -3,3 +3,6 @@ jinja2
 rich
 pandas
 poetry
+tree-sitter
+tree-sitter-python
+tree-sitter-javascript
