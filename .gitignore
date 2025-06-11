@@ -13,6 +13,8 @@ desktop.ini
 *.sln
 *.swp
 *~
+.idea/*
+reports/*
 
 # Build Output
 node_modules/
@@ -28,6 +30,7 @@ jspm_packages/
 typings/
 *.jar
 *.war
+**/__pycache__/*
 
 # Logs and Temporary Files
 *.log
