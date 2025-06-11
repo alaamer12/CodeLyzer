@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "codelyzer"
-version = "0.1.0b7"
+version = "0.1.0b11"
 description = "A powerful, extensible static code analysis tool with multi-language support"
 authors = ["Alaamer <ahmedmuhmmed239@gmail.com>"]
 readme = "README.md"
