@@ -13,7 +13,6 @@ try:
     import tree_sitter_python
     import tree_sitter_javascript
     import tree_sitter_typescript
-    import tree_sitter_rust
     TREE_SITTER_AVAILABLE = True
 except ImportError:
     tree_sitter_python = None
@@ -320,7 +319,7 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
             return
 
         root_node = ast_data.root_node
-        
+
         # Extract structure metrics (classes, functions, methods, imports)
         structure_metrics = self._extract_structure_metrics(root_node)
         
@@ -336,10 +335,10 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
         function_count = 0
         method_count = 0
         imports_list = []
-        
+
         def process_node(node):
             nonlocal class_count, function_count, method_count, imports_list
-            
+
             if node.type == "class_definition":
                 class_count += 1
             elif node.type == "function_definition":
@@ -349,14 +348,14 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
                     function_count += 1
             elif node.type in ["import_statement", "import_from_statement"]:
                 imports_list.append(node.text.decode('utf8').split('\n')[0])
-            
+
             # Process children
             for child in node.children:
                 process_node(child)
-        
+
         # Start processing from root
         process_node(root_node)
-        
+
         return {
             'classes': class_count,
             'functions': function_count,
@@ -662,161 +661,80 @@ class TypeScriptASTAnalyzer(TreeSitterASTAnalyzer):
         return complexity
 
 
-class RustASTAnalyzer(TreeSitterASTAnalyzer):
-    """Analyzer for Rust files using tree-sitter"""
+class RustStubASTAnalyzer(ASTAnalyzer):
+    """Stub analyzer for Rust files when tree-sitter-rust is incompatible"""
 
     extensions = ['.rs']
-    language_name = "rust"
-    language_module = tree_sitter_rust if TREE_SITTER_AVAILABLE else None
-    comment_types = ["line_comment", "block_comment"]
-
+    
     def __init__(self):
-        """Initialize the Rust analyzer"""
-        self.language_parser = None  # We'll initialize it properly in _parse_with_timeout
-
+        """Initialize the Rust stub analyzer"""
+        console.print("[yellow]Using stub analyzer for Rust due to compatibility issues[/yellow]")
+        console.print("[yellow]This will provide basic metrics without AST analysis[/yellow]")
+    
     @classmethod
     def _get_language_name(cls) -> str:
         return "rust"
-
+    
     def _parse_with_timeout(self, content: str, file_path: str) -> Any:
-        """Parse the file content into an AST with timeout handling"""
-        if self.language_parser is None:
-            try:
-                # Try using tree_sitter_languages if available (it handles version compatibility)
-                try:
-                    from tree_sitter_languages import get_parser
-                    self.language_parser = get_parser('rust')
-                    console.print(f"[green]Successfully initialized Rust parser using tree_sitter_languages[/green]")
-                except ImportError:
-                    get_parser = None
-                    # Fall back to direct initialization, but this might have version issues
-                    try:
-                        language = Language(tree_sitter_rust.language())
-                        parser = Parser()
-                        parser.language = language
-                        self.language_parser = parser
-                        console.print(f"[green]Successfully initialized Rust parser[/green]")
-                    except Exception as e:
-                        console.print(f"[red]Error initializing Rust parser: {str(e)}[/red]")
-                        console.print("[yellow]Try installing tree_sitter_languages for better compatibility:[/yellow]")
-                        console.print("[yellow]pip install tree_sitter_languages[/yellow]")
-                        self.language_parser = None
-                        return Exception(f"Parser for Rust could not be initialized: {str(e)}")
-            except Exception as e:
-                console.print(f"[red]Error initializing Rust parser: {str(e)}[/red]")
-                self.language_parser = None
-                return Exception(f"Parser for Rust could not be initialized: {str(e)}")
-
-        # Define a function to do the parsing
-        def parse_content():
-            try:
-                tree = self.language_parser.parse(bytes(content, 'utf8'))
-                return tree
-            except Exception as e:
-                return e
-
-        # Execute with timeout
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(parse_content)
-            try:
-                return future.result(timeout=PARSE_TIMEOUT)
-            except (concurrent.futures.TimeoutError, Exception) as e:
-                console.print(f"[yellow]Warning: Parsing {file_path} timed out or failed[/yellow]")
-                return e
-
+        """Return None since we can't parse the AST"""
+        return None
+    
     def _calculate_metrics(self, ast_data: Any, metrics: FileMetrics, content: str = None) -> None:
-        """Calculate Rust-specific metrics from the tree-sitter AST"""
-        if ast_data is None or isinstance(ast_data, Exception):
-            return
-
-        root_node = ast_data.root_node
-
-        # Initialize counters
-        struct_count = 0
-        function_count = 0
-        trait_count = 0
-        impl_count = 0
-        enum_count = 0
-        mod_count = 0
-        imports_list = []
-
-        # Process the AST
-        def process_node(node):
-            nonlocal struct_count, function_count, trait_count, impl_count, enum_count, mod_count, imports_list
-
-            if node.type == "struct_item":
-                struct_count += 1
-            elif node.type == "function_item":
-                function_count += 1
-            elif node.type == "trait_item":
-                trait_count += 1
-            elif node.type == "impl_item":
-                impl_count += 1
-            elif node.type == "enum_item":
-                enum_count += 1
-            elif node.type == "mod_item":
-                mod_count += 1
-            elif node.type == "use_declaration":
-                imports_list.append(node.text.decode('utf8').split('\n')[0])
-
-            # Process children
-            for child in node.children:
-                process_node(child)
-
-        # Start processing from root
-        process_node(root_node)
-
-        # Update metrics
-        metrics.structure.classes = struct_count + trait_count  # Use classes for structs and traits
-        metrics.structure.functions = function_count
-        metrics.structure.imports = imports_list
+        """Calculate basic metrics without AST analysis"""
+        # We can still calculate some basic metrics from the content
+        if content:
+            # Count functions by looking for 'fn' keyword
+            fn_count = content.count("\nfn ")
+            metrics.structure.functions = fn_count
+            
+            # Count structs by looking for 'struct' keyword
+            struct_count = content.count("\nstruct ")
+            
+            # Count impls by looking for 'impl' keyword
+            impl_count = content.count("\nimpl ")
+            
+            # Count traits by looking for 'trait' keyword
+            trait_count = content.count("\ntrait ")
+            
+            # Use structs + traits as a rough estimate for "classes"
+            metrics.structure.classes = struct_count + trait_count
+            
+            # Count imports by looking for 'use' statements
+            import_count = content.count("\nuse ")
+            metrics.structure.imports = [f"use_statement_{i+1}" for i in range(import_count)]
+            
+            # Add Rust specific metrics
+            rust_metrics = FileMetricCategory()
+            rust_metrics.add_metric("structs", struct_count)
+            rust_metrics.add_metric("traits", trait_count)
+            rust_metrics.add_metric("impls", impl_count)
+            metrics.add_custom_metric_category("rust", rust_metrics)
+            
+            # Very rough complexity estimate based on control flow keywords
+            complexity = 1
+            complexity += content.count("if ")
+            complexity += content.count("else ")
+            complexity += content.count("match ")
+            complexity += content.count("for ")
+            complexity += content.count("while ")
+            complexity += content.count("loop ")
+            metrics.complexity.cyclomatic_complexity = complexity
+            metrics.complexity.complexity_score = float(complexity)
+    
+    def _count_comment_lines(self, content: str) -> int:
+        """Count comment lines by simple text analysis"""
+        if not content:
+            return 0
         
-        # Add Rust specific metrics as custom metrics
-        rust_metrics = FileMetricCategory()
-        rust_metrics.add_metric("structs", struct_count)
-        rust_metrics.add_metric("traits", trait_count)
-        rust_metrics.add_metric("impls", impl_count)
-        rust_metrics.add_metric("enums", enum_count)
-        rust_metrics.add_metric("modules", mod_count)
-        metrics.add_custom_metric_category("rust", rust_metrics)
-
-        # Calculate cyclomatic complexity
-        complexity = self._calculate_cyclomatic_complexity(root_node)
-        metrics.complexity.cyclomatic_complexity = complexity
-        metrics.complexity.complexity_score = float(complexity)
-
-    @staticmethod
-    def _calculate_cyclomatic_complexity(root_node: Any) -> int:
-        """Calculate cyclomatic complexity for Rust code"""
-        complexity = 1  # Start with 1
-
-        # Branch keywords and operators
-        branch_types = [
-            "if_expression", "else_clause",
-            "for_expression", "while_expression", "loop_expression",
-            "match_expression", "match_arm",
-            "macro_invocation",  # Some macros like try! increase complexity
-            "binary_expression",  # For && and ||
-            "question_mark_expression"  # ? operator for error handling
-        ]
-
-        def traverse(node):
-            nonlocal complexity
-
-            if node.type in branch_types:
-                # For binary expressions, only count && and || operators
-                if node.type == "binary_expression":
-                    operator = node.child_by_field_name("operator")
-                    if operator and operator.type in ["&&", "||"]:
-                        complexity += 1
-                else:
-                    complexity += 1
-
-            for child in node.children:
-                traverse(child)
-
-        traverse(root_node)
-        return complexity
+        lines = content.split('\n')
+        comment_count = 0
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('//') or line.startswith('/*') or line.endswith('*/'):
+                comment_count += 1
+        
+        return comment_count
 
 
 # Initialize the analyzers
@@ -824,17 +742,136 @@ def initialize_analyzers():
     """Initialize all tree-sitter analyzers"""
     if not TREE_SITTER_AVAILABLE:
         console.print("[yellow]Warning: tree-sitter or language modules not available.[/yellow]")
-        console.print("[yellow]Install them with: pip install tree-sitter tree-sitter-python tree-sitter-javascript tree-sitter-typescript tree-sitter-languages[/yellow]")
+        console.print("[yellow]Install them with: pip install tree-sitter tree-sitter-python tree-sitter-javascript[/yellow]")
+        console.print("[yellow]For TypeScript and Rust, consider using tree-sitter-languages for better compatibility:[/yellow]")
+        console.print("[yellow]pip install tree-sitter-languages[/yellow]")
         return
     
-    PythonASTAnalyzer.initialize_parser()
-    JavaScriptASTAnalyzer.initialize_parser()
-    # TypeScript and Rust parsers are initialized when needed
-    console.print("[green]Initialized tree-sitter parsers for: Python, JavaScript[/green]")
-    console.print("[blue]TypeScript and Rust parsers will be initialized when needed[/blue]")
+    try:
+        PythonASTAnalyzer.initialize_parser()
+        console.print("[green]Initialized tree-sitter parser for Python[/green]")
+    except Exception as e:
+        console.print(f"[red]Failed to initialize Python parser: {str(e)}[/red]")
+    
+    try:
+        JavaScriptASTAnalyzer.initialize_parser()
+        console.print("[green]Initialized tree-sitter parser for JavaScript[/green]")
+    except Exception as e:
+        console.print(f"[red]Failed to initialize JavaScript parser: {str(e)}[/red]")
+    
+    # TypeScript parser is initialized when needed
+    console.print("[blue]TypeScript parser will be initialized when needed[/blue]")
+    
+    # Use RustStubASTAnalyzer instead of trying to initialize RustASTAnalyzer
+    # Register the stub analyzer for .rs files
+    ASTAnalyzer.ANALYZERS['.rs'] = RustStubASTAnalyzer
+    console.print("[yellow]Using stub analyzer for Rust due to compatibility issues[/yellow]")
+    console.print("[yellow]For better Rust support, fix the version compatibility between tree-sitter and tree-sitter-rust[/yellow]")
+
+
+def test_rust_parser():
+    """Test function to diagnose Rust parser initialization issues"""
+    console.print("[bold]Testing Rust parser initialization...[/bold]")
+    
+    try:
+        import tree_sitter
+        console.print(f"tree-sitter version: {tree_sitter.__version__}")
+    except Exception as e:
+        console.print(f"Error importing tree_sitter: {e}")
+    
+    try:
+        import tree_sitter_rust
+        console.print("tree_sitter_rust imported successfully")
+        
+        # Try to access language attribute
+        if hasattr(tree_sitter_rust, 'language'):
+            console.print("tree_sitter_rust.language exists")
+            
+            # Check if it's callable
+            if callable(tree_sitter_rust.language):
+                console.print("tree_sitter_rust.language is callable")
+                try:
+                    lang_obj = tree_sitter_rust.language()
+                    console.print(f"Called tree_sitter_rust.language() successfully: {type(lang_obj)}")
+                except Exception as e:
+                    console.print(f"Error calling tree_sitter_rust.language(): {e}")
+            else:
+                console.print("tree_sitter_rust.language is not callable")
+                console.print(f"Type of tree_sitter_rust.language: {type(tree_sitter_rust.language)}")
+        else:
+            console.print("tree_sitter_rust.language does not exist")
+            
+        # List all attributes
+        console.print("All attributes of tree_sitter_rust:")
+        for attr in dir(tree_sitter_rust):
+            if not attr.startswith('_'):
+                console.print(f"- {attr}: {type(getattr(tree_sitter_rust, attr))}")
+    except Exception as e:
+        console.print(f"Error with tree_sitter_rust: {e}")
+    
+    try:
+        from tree_sitter_languages import get_parser
+        console.print("tree_sitter_languages.get_parser is available")
+        try:
+            parser = get_parser('rust')
+            console.print("Successfully created Rust parser using tree_sitter_languages")
+            console.print(f"Parser type: {type(parser)}")
+        except Exception as e:
+            console.print(f"Error creating Rust parser with tree_sitter_languages: {e}")
+    except Exception as e:
+        console.print(f"Error with tree_sitter_languages: {e}")
+        
+    # Try direct parser creation without Language constructor
+    try:
+        parser = tree_sitter.Parser()
+        console.print("Created tree_sitter.Parser successfully")
+        
+        try:
+            # Try direct assignment
+            parser.language = tree_sitter_rust.language
+            console.print("Direct assignment of tree_sitter_rust.language succeeded")
+        except Exception as e:
+            console.print(f"Direct assignment failed: {e}")
+            
+            try:
+                # Try calling it first
+                lang_obj = tree_sitter_rust.language()
+                parser.language = lang_obj
+                console.print("Assignment after calling tree_sitter_rust.language() succeeded")
+            except Exception as e:
+                console.print(f"Assignment after calling failed: {e}")
+    except Exception as e:
+        console.print(f"Error creating parser: {e}")
 
 
 if __name__ == "__main__":
+    
+    tests_path = r"E:\Projects\Languages\Python\WorkingOnIt\CodeLyzer\test_examples"
+
+    # Test JavaScript analyzer
+    console.print("\n[bold]Testing JavaScript analyzer...[/bold]")
     analyzer = JavaScriptASTAnalyzer()
-    metrics = analyzer.analyze_file("test.js")
-    print(metrics)
+    metrics = analyzer.analyze_file(os.path.join(tests_path, "test.js"))
+    console.print(metrics)
+    console.print("--------------------------------")
+
+    # Test Python analyzer
+    console.print("\n[bold]Testing Python analyzer...[/bold]")
+    analyzer = PythonASTAnalyzer()
+    metrics = analyzer.analyze_file(os.path.join(tests_path, "test.py"))
+    console.print(metrics)
+    console.print("--------------------------------")
+
+    # Test TypeScript analyzer
+    console.print("\n[bold]Testing TypeScript analyzer...[/bold]")
+    analyzer = TypeScriptASTAnalyzer()
+    metrics = analyzer.analyze_file(os.path.join(tests_path, "test.ts"))
+    console.print(metrics)
+    console.print("--------------------------------")
+
+    # Test Rust analyzer
+    console.print("\n[bold]Testing Rust analyzer...[/bold]")
+    analyzer = RustStubASTAnalyzer()
+    metrics = analyzer.analyze_file(os.path.join(tests_path, "test.rs"))
+    console.print(metrics)
+    console.print("--------------------------------")
