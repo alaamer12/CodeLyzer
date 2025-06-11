@@ -1,3 +1,4 @@
 typer
 jinja2
 rich
+pandas

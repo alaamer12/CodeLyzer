@@ -1,140 +1,167 @@
-# 🔍 CodeLyzer - Advanced Codebase Analysis Tool
+# CodeLyzer
 
-[![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json)](https://github.com/charliermarsh/ruff)
+[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
-CodeLyzer is a powerful, feature-rich static code analysis tool designed to help developers understand, maintain, and improve codebases of any size. With support for multiple programming languages and beautiful visualizations, CodeLyzer makes it easy to identify code quality issues, complexity hotspots, and architectural patterns.
+A powerful, extensible static code analyzer with multi-language support, beautiful terminal output, and comprehensive metrics.
 
-## ✨ Features
+## Features
 
-- **Multi-Language Support**: Analyze Python, JavaScript, Java, C++, Go, Rust, and more
-- **Comprehensive Metrics**: Lines of code, complexity, maintainability, and more
-- **Code Quality Assessment**: Detect code smells, security vulnerabilities, and anti-patterns
-- **Beautiful Visualizations**: Rich terminal output with tables, progress bars, and charts
-- **HTML & JSON Reports**: Generate detailed reports for sharing and further analysis
-- **Project Comparison**: Compare metrics between different codebases or versions
-- **Hotspot Detection**: Identify the most complex and problematic files
+- **Multi-Language Support**: Analyze Python, JavaScript, TypeScript, and more (extensible architecture)
+- **Comprehensive Metrics**: Code complexity, quality scores, maintainability index, and more
+- **Security Analysis**: Detect common security vulnerabilities in your code
+- **Code Smell Detection**: Find problematic patterns and anti-patterns
+- **Beautiful Reports**: Terminal, HTML, and JSON reporting options
+- **Modular Architecture**: Easily extend with new languages and analyzers
 
-## 📋 Requirements
+## Installation
 
-- Python 3.7+
-- Dependencies listed in requirements.txt
+### Using pip (recommended)
 
-## 🚀 Installation
+```bash
+pip install codelyzer
+```
 
-1. Clone this repository:
+### Using Poetry
+
+```bash
+poetry add codelyzer
+```
+
+### From Source
 
 ```bash
 git clone https://github.com/yourusername/codelyzer.git
 cd codelyzer
+poetry install
 ```
 
-2. Install dependencies:
+## Quick Start
+
+Analyze your project with a single command:
 
 ```bash
-pip install -r requirements.txt
+codelyzer analyze /path/to/your/project
 ```
 
-## 📊 Usage
+## Usage
 
-### Basic Analysis
-
-Analyze the current directory:
+### Basic Usage
 
 ```bash
-python cli.py analyze
+codelyzer analyze [PATH] [OPTIONS]
 ```
 
-Analyze a specific directory:
+If no path is specified, the current directory is analyzed.
 
+### Options
+
+```
+--exclude, -e TEXT       Additional directories to exclude
+--include-tests          Include test directories in analysis
+--format, -f [terminal|html|json|all]
+                         Output format (default: terminal)
+--verbose                Show detailed progress and information
+--help                   Show this message and exit.
+```
+
+### Examples
+
+Analyze current directory and output to terminal:
 ```bash
-python cli.py analyze /path/to/project
+codelyzer analyze
 ```
 
-### Excluding Directories
-
+Analyze specific project with HTML report:
 ```bash
-python cli.py analyze --exclude node_modules --exclude dist
+codelyzer analyze /path/to/project --format html
 ```
 
-### Include Test Directories
-
-By default, test directories are excluded. Include them with:
-
+Exclude specific directories:
 ```bash
-python cli.py analyze --include-tests
+codelyzer analyze --exclude vendor --exclude node_modules
 ```
 
-### Output Formats
-
-Generate HTML and JSON reports:
-
+Include test directories in analysis:
 ```bash
-python cli.py analyze --format all --output ./reports
+codelyzer analyze --include-tests
 ```
 
-### Comparing Projects
+## Output Formats
 
+### Terminal Output
+
+The default output provides a detailed terminal report with color-coded sections for:
+- Summary statistics
+- Language distribution
+- Complexity metrics
+- Most complex files
+- Largest files
+- Security issues
+- Code smells
+
+### HTML Report
+
+Generate a beautiful HTML report with:
 ```bash
-python cli.py compare /path/to/project1 /path/to/project2
+codelyzer analyze --format html
 ```
 
-### View Supported Languages
+The report will be saved to `codelyzer_report.html` in the current directory.
 
+### JSON Output
+
+Export detailed analysis data in JSON format for further processing:
 ```bash
-python cli.py languages
+codelyzer analyze --format json
 ```
 
-### Verbose Output
+The JSON data will be saved to `codelyzer_report.json` in the current directory.
 
-```bash
-python cli.py analyze --verbose
-```
-
-## 📊 Sample Output
+## Project Structure
 
 ```
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃           📋 Analysis Summary                     ┃
-┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
-┃ 📊 Project Overview                              ┃
-┃ • Files analyzed: 42                             ┃
-┃ • Lines of code: 5,280                           ┃
-┃ • Source lines: 3,847                            ┃
-┃                                                  ┃
-┃ 🏗️ Code Structure                               ┃
-┃ • Classes: 15                                    ┃
-┃ • Functions: 87                                  ┃
-┃ • Methods: 53                                    ┃
-┃                                                  ┃
-┃ 📈 Quality Metrics                              ┃
-┃ • Code quality: 82.5/100                         ┃
-┃ • Maintainability: 76.3/100                      ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+codelyzer/
+├── ast_analyzers/       # Language-specific AST analyzers
+├── cli.py               # Command-line interface
+├── config.py            # Configuration and constants
+├── console.py           # Console output utilities
+├── core.py              # Core analyzer implementation
+└── utils.py             # Utility functions
 ```
 
-## 📁 Project Structure
+## Extending CodeLyzer
 
-```
-codebase_analyzer/
-├── cli.py           # Command-line interface
-├── config.py        # Configuration settings
-├── core.py          # Core analysis logic
-├── requirements.txt # Package dependencies
-├── LICENSE          # MIT License
-└── README.md        # This documentation
-```
+CodeLyzer is designed with extensibility in mind. You can create new analyzers for additional languages by:
 
-## 🤝 Contributing
+1. Creating a new class that inherits from `ASTAnalyzer`
+2. Implementing the required methods
+3. Registering the analyzer with the appropriate file extensions
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+See the [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Contributing
 
-## 📄 License
+Contributions are welcome! Please check out our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Setting up the development environment
+- Code style guidelines
+- Commit conventions
+- Pull request process
+
+## Security
+
+For information about reporting security vulnerabilities, please see our [Security Policy](SECURITY.md).
+
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Rich](https://github.com/Textualize/rich) for beautiful terminal output
+- [AST](https://docs.python.org/3/library/ast.html) for Python parsing
+- [Esprima](https://github.com/Kronuz/esprima-python) for JavaScript parsing
