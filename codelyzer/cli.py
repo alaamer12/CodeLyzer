@@ -36,8 +36,8 @@ def generate_reports(metrics, output_format: str, output_dir: str, project_path:
 
         html_file = output_path / f"{project_path.name}_analysis.html"
 
-        # Generate HTML content using our direct method
-        html_content = generate_direct_html(metrics)
+        # Generate HTML content using our direct method and pass the output directory
+        html_content = generate_direct_html(metrics, str(output_path))
 
         # Write to file
         with open(html_file, 'w', encoding='utf-8') as f:
