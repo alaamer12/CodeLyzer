@@ -566,21 +566,53 @@ class PlotReportGenerator:
             HTML string for the chart container
         """
         icon_map = {
-            'languages': '<i class="fas fa-code text-blue-500" aria-hidden="true"></i>',
-            'complexity': '<i class="fas fa-layer-group text-orange-500" aria-hidden="true"></i>',
-            'security': '<i class="fas fa-shield-alt text-red-500" aria-hidden="true"></i>',
-            'code_smells': '<i class="fas fa-bug text-purple-500" aria-hidden="true"></i>'
+            'languages': '<i class="fas fa-code text-blue-500 animate-icon-pulse" aria-hidden="true"></i>',
+            'complexity': '<i class="fas fa-layer-group text-orange-500 animate-icon-pulse" aria-hidden="true"></i>',
+            'security': '<i class="fas fa-shield-alt text-red-500 animate-icon-pulse" aria-hidden="true"></i>',
+            'code_smells': '<i class="fas fa-bug text-purple-500 animate-icon-pulse" aria-hidden="true"></i>'
         }
 
-        icon = icon_map.get(chart_id, '<i class="fas fa-chart-pie text-blue-500" aria-hidden="true"></i>')
+        icon = icon_map.get(chart_id, '<i class="fas fa-chart-pie text-blue-500 animate-icon-pulse" aria-hidden="true"></i>')
+        
+        hover_effect_class = "card-3d-effect"
+        
+        # Add specific hover effects for different chart types
+        hover_effects = {
+            'languages': '''
+                <div class="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:animate-ping" style="animation-delay: 0.1s;"></div>
+                <div class="absolute top-1 right-1 w-1.5 h-1.5 bg-green-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:animate-ping" style="animation-delay: 0.2s;"></div>
+                <div class="absolute -bottom-1 right-2 w-1 h-1 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:animate-ping" style="animation-delay: 0.3s;"></div>
+            ''',
+            'complexity': '''
+                <div class="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 ease-out"></div>
+            ''',
+            'security': '''
+                <div class="absolute inset-0 rounded-2xl border-2 border-red-500/0 group-hover:border-red-500/20 transition-all duration-500"></div>
+                <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-30 transition-opacity duration-500">
+                    <div class="w-10 h-0.5 bg-red-500/50 group-hover:animate-pulse"></div>
+                    <div class="w-7 h-0.5 bg-red-500/30 mt-1 group-hover:animate-pulse" style="animation-delay: 0.2s;"></div>
+                    <div class="w-4 h-0.5 bg-red-500/20 mt-1 group-hover:animate-pulse" style="animation-delay: 0.4s;"></div>
+                </div>
+            ''',
+            'code_smells': '''
+                <div class="absolute inset-0 bg-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-2xl group-hover:animate-pulse"></div>
+                <div class="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-purple-600 via-purple-400 to-purple-600 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1200 ease-in-out"></div>
+            '''
+        }
+        
+        hover_effect = hover_effects.get(chart_id, '''
+            <div class="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-blue-500 to-blue-300 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 ease-out"></div>
+        ''')
 
         return f'''
-        <div class="bg-card p-6 rounded-2xl shadow-md border border-theme h-full">
-            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-body">
-                {icon} {title}
+        <div class="stat-card {hover_effect_class} bg-card p-6 rounded-2xl shadow-md border border-theme h-full transition-all duration-500 hover:shadow-xl relative overflow-hidden group hover:scale-105">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-body transition-all duration-300 group-hover:translate-x-2">
+                {icon} 
+                <span class="transition-all duration-300 group-hover:text-blue-500">{title}</span>
             </h3>
-            <div class="h-64 w-full">
-                <canvas id="chart-{chart_id}" data-chart-type="{chart_type}" data-chart-data="{chart_id}"></canvas>
+            {hover_effect}
+            <div class="h-64 w-full relative z-10 card-inner">
+                <canvas id="chart-{chart_id}" data-chart-type="{chart_type}" data-chart-data="{chart_id}" class="transition-all duration-500 group-hover:scale-105"></canvas>
             </div>
         </div>'''
 
@@ -616,65 +648,110 @@ class MetricsGridComponent(ReportComponent):
         """Render the metrics grid HTML section"""
         return f'''
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10 fade-in">
-            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
-                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-300 group-hover:h-1.5"></div>
-                <div class="flex items-center justify-between mb-5">
-                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
-                        <i class="fas fa-file-code" aria-hidden="true"></i>
+            <div class="stat-card card-3d-effect bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-500 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2 hover:scale-105" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-blue-400 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 ease-out"></div>
+                <div class="card-inner flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white text-xl shadow-md transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 relative">
+                        <i class="fas fa-file-code animate-icon-pulse" aria-hidden="true"></i>
+                        <div class="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:animate-ping" style="animation-delay: 0.1s;"></div>
+                        <div class="absolute -bottom-1 -left-1 w-1.5 h-1.5 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:animate-ping" style="animation-delay: 0.3s;"></div>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.total_files:,}</div>
-                <div class="text-muted font-medium uppercase text-xs tracking-wider">Files Analyzed</div>
+                <div class="transform transition-all duration-700 group-hover:translate-x-2">
+                    <div class="text-5xl font-bold text-body leading-none mb-2 transition-all duration-700 group-hover:scale-110 group-hover:text-blue-600">{metrics.total_files:,}</div>
+                    <div class="text-muted font-medium uppercase text-xs tracking-wider transition-colors duration-300 group-hover:text-blue-600">Files Analyzed</div>
+                </div>
+                <div class="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-lg"></div>
             </div>
-            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
-                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300 group-hover:h-1.5"></div>
-                <div class="flex items-center justify-between mb-5">
-                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
-                        <i class="fas fa-code" aria-hidden="true"></i>
+
+            <div class="stat-card card-3d-effect bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-500 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-green-600 focus-within:outline-offset-2 hover:scale-105" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 to-green-400 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 ease-out"></div>
+                <div class="card-inner flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 relative">
+                        <i class="fas fa-code animate-icon-pulse" aria-hidden="true"></i>
+                        <div class="absolute top-2 left-1 w-1 h-1 bg-green-500 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-300" style="animation-delay: 0s;"></div>
+                        <div class="absolute top-4 left-2 w-1 h-1 bg-green-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-300" style="animation-delay: 0.2s;"></div>
+                        <div class="absolute top-6 left-3 w-1 h-1 bg-green-300 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-300" style="animation-delay: 0.4s;"></div>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.total_loc:,}</div>
-                <div class="text-muted font-medium uppercase text-xs tracking-wider">Lines of Code</div>
+                <div class="transform transition-all duration-700 group-hover:translate-x-2">
+                    <div class="text-5xl font-bold text-body leading-none mb-2 transition-all duration-700 group-hover:scale-110 group-hover:text-green-600">{metrics.total_loc:,}</div>
+                    <div class="text-muted font-medium uppercase text-xs tracking-wider transition-colors duration-300 group-hover:text-green-600">Lines of Code</div>
+                </div>
+                <div class="absolute inset-0 bg-green-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-lg"></div>
             </div>
-            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
-                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-500 to-yellow-400 transition-all duration-300 group-hover:h-1.5"></div>
-                <div class="flex items-center justify-between mb-5">
-                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
-                        <i class="fas fa-cube" aria-hidden="true"></i>
+
+            <div class="stat-card card-3d-effect bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-500 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-yellow-600 focus-within:outline-offset-2 hover:scale-105" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-500 to-yellow-400 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 ease-out"></div>
+                <div class="card-inner flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 relative">
+                        <i class="fas fa-cube animate-icon-pulse" aria-hidden="true"></i>
+                        <div class="absolute -top-1 -left-1 w-1 h-1 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-300" style="animation-delay: 0s;"></div>
+                        <div class="absolute -top-2 -right-1 w-1.5 h-1.5 bg-yellow-300 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-300" style="animation-delay: 0.3s;"></div>
+                        <div class="absolute -bottom-1 -left-2 w-1 h-1 bg-yellow-200 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-300" style="animation-delay: 0.6s;"></div>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.total_classes:,}</div>
-                <div class="text-muted font-medium uppercase text-xs tracking-wider">Classes</div>
+                <div class="transform transition-all duration-700 group-hover:translate-x-2">
+                    <div class="text-5xl font-bold text-body leading-none mb-2 transition-all duration-700 group-hover:scale-110 group-hover:text-yellow-600">{metrics.total_classes:,}</div>
+                    <div class="text-muted font-medium uppercase text-xs tracking-wider transition-colors duration-300 group-hover:text-yellow-600">Classes</div>
+                </div>
+                <div class="absolute inset-0 bg-yellow-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-lg"></div>
             </div>
-            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
-                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-red-400 transition-all duration-300 group-hover:h-1.5"></div>
-                <div class="flex items-center justify-between mb-5">
-                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
-                        <i class="fas fa-cogs" aria-hidden="true"></i>
+
+            <div class="stat-card card-3d-effect bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-500 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-red-600 focus-within:outline-offset-2 hover:scale-105" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-red-400 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 ease-out"></div>
+                <div class="card-inner flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 relative">
+                        <i class="fas fa-cogs animate-icon-pulse" aria-hidden="true"></i>
+                        <!-- Ripple effects for activity -->
+                        <div class="absolute inset-0 rounded-full bg-red-500/20 opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-700"></div>
+                        <div class="absolute inset-1 rounded-full bg-red-500/15 opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-700" style="animation-delay: 0.3s;"></div>
+                        <div class="absolute inset-2 rounded-full bg-red-500/10 opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-all duration-700" style="animation-delay: 0.6s;"></div>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.total_functions:,}</div>
-                <div class="text-muted font-medium uppercase text-xs tracking-wider">Functions</div>
+                <div class="transform transition-all duration-700 group-hover:translate-x-2">
+                    <div class="text-5xl font-bold text-body leading-none mb-2 transition-all duration-700 group-hover:scale-110 group-hover:text-red-600">{metrics.total_functions:,}</div>
+                    <div class="text-muted font-medium uppercase text-xs tracking-wider transition-colors duration-300 group-hover:text-red-600">Functions</div>
+                </div>
+                <div class="absolute inset-0 bg-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-lg"></div>
             </div>
-            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
-                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-300 group-hover:h-1.5"></div>
-                <div class="flex items-center justify-between mb-5">
-                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
-                        <i class="fas fa-star" aria-hidden="true"></i>
+
+            <div class="stat-card card-3d-effect bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-500 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2 hover:scale-105" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 via-blue-300 to-blue-400 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 ease-out"></div>
+                <div class="card-inner flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white text-xl shadow-md transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 relative">
+                        <i class="fas fa-star animate-icon-pulse" aria-hidden="true"></i>
+                        <!-- Sparkle effects around the star -->
+                        <div class="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:animate-ping" style="animation-delay: 0.1s;"></div>
+                        <div class="absolute -top-2 right-1 w-1.5 h-1.5 bg-blue-300 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:animate-ping" style="animation-delay: 0.2s;"></div>
+                        <div class="absolute top-0 -right-2 w-1 h-1 bg-blue-200 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-500 group-hover:animate-ping" style="animation-delay: 0.3s;"></div>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.code_quality_score:.1f}%</div>
-                <div class="text-muted font-medium uppercase text-xs tracking-wider">Code Quality</div>
+                <div class="transform transition-all duration-700 group-hover:translate-x-2">
+                    <div class="text-5xl font-bold text-body leading-none mb-2 transition-all duration-700 group-hover:scale-110 group-hover:text-blue-400 group-hover:drop-shadow-lg">{metrics.code_quality_score:.1f}%</div>
+                    <div class="text-muted font-medium uppercase text-xs tracking-wider transition-colors duration-300 group-hover:text-blue-400">Code Quality</div>
+                </div>
+                <div class="absolute inset-0 bg-blue-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-lg group-hover:animate-pulse"></div>
             </div>
-            <div class="bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-blue-600 focus-within:outline-offset-2" tabindex="0">
-                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-300 group-hover:h-1.5"></div>
-                <div class="flex items-center justify-between mb-5">
-                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
-                        <i class="fas fa-tools" aria-hidden="true"></i>
+
+            <div class="stat-card card-3d-effect bg-card p-7 rounded-2xl shadow-md border border-theme transition-all duration-500 hover:shadow-xl relative overflow-hidden group focus-within:outline-2 focus-within:outline-purple-600 focus-within:outline-offset-2 hover:scale-105" tabindex="0">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-purple-400 to-purple-300 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1200 ease-in-out"></div>
+                <div class="card-inner flex items-center justify-between mb-5">
+                    <div class="w-13 h-13 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white text-xl shadow-md transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 relative">
+                        <i class="fas fa-tools animate-icon-pulse" aria-hidden="true"></i>
+                        <!-- Floating mini boxes to represent tools -->
+                        <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-30 transition-opacity duration-500">
+                            <div class="w-8 h-0.5 bg-purple-300 group-hover:animate-pulse"></div>
+                            <div class="w-6 h-0.5 bg-purple-300/70 mt-1 group-hover:animate-pulse" style="animation-delay: 0.2s;"></div>
+                            <div class="w-4 h-0.5 bg-purple-300/50 mt-1 group-hover:animate-pulse" style="animation-delay: 0.4s;"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="text-5xl font-bold text-body leading-none mb-2">{metrics.maintainability_score:.1f}%</div>
-                <div class="text-muted font-medium uppercase text-xs tracking-wider">Maintainability</div>
+                <div class="transform transition-all duration-700 group-hover:translate-x-2">
+                    <div class="text-5xl font-bold text-body leading-none mb-2 transition-all duration-700 group-hover:scale-110 group-hover:text-purple-500">{metrics.maintainability_score:.1f}%</div>
+                    <div class="text-muted font-medium uppercase text-xs tracking-wider transition-colors duration-300 group-hover:text-purple-500">Maintainability</div>
+                </div>
+                <div class="absolute inset-0 bg-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-lg"></div>
             </div>
         </div>'''
 
@@ -703,15 +780,39 @@ class ThemeToggleComponent(ReportComponent):
         """Render the theme toggle button HTML section"""
         return '''
         <div class="fixed top-4 right-4 z-50">
-            <button id="theme-toggle" class="p-3 rounded-full bg-white/80 dark:bg-gray-800/80 shadow-md hover:shadow-lg transition-all duration-300 backdrop-blur-md border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">
-                <!-- Sun icon (shown in dark mode) -->
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-                <!-- Moon icon (shown in light mode) -->
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
+            <button id="theme-toggle" class="p-3 rounded-full bg-white/80 dark:bg-gray-800/80 shadow-md hover:shadow-xl transition-all duration-300 backdrop-blur-md border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 group relative overflow-hidden">
+                <!-- Animated background pulse -->
+                <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 dark:from-yellow-500/10 dark:to-orange-500/10"></div>
+                
+                <!-- Rotation container for smooth spinning transition -->
+                <div class="transform transition-all duration-500 group-hover:rotate-180 group-active:scale-90">
+                    <!-- Sun icon (shown in dark mode) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block transform transition-transform duration-1000 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <!-- Moon icon (shown in light mode) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 block dark:hidden transform transition-transform duration-1000 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </div>
+                
+                <!-- Light particles around sun (in dark mode) -->
+                <div class="absolute inset-0 hidden dark:block">
+                    <div class="absolute top-0 left-1/2 w-0.5 h-0.5 bg-yellow-300 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:animate-ping" style="animation-delay: 0.1s;"></div>
+                    <div class="absolute top-1/4 right-0 w-0.5 h-0.5 bg-yellow-300 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:animate-ping" style="animation-delay: 0.2s;"></div>
+                    <div class="absolute bottom-0 left-1/2 w-0.5 h-0.5 bg-yellow-300 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:animate-ping" style="animation-delay: 0.3s;"></div>
+                    <div class="absolute top-1/4 left-0 w-0.5 h-0.5 bg-yellow-300 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:animate-ping" style="animation-delay: 0.4s;"></div>
+                </div>
+                
+                <!-- Stars around moon (in light mode) -->
+                <div class="absolute inset-0 block dark:hidden">
+                    <div class="absolute top-0 right-0 w-0.5 h-0.5 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:animate-ping" style="animation-delay: 0.1s;"></div>
+                    <div class="absolute bottom-0 right-1/4 w-0.5 h-0.5 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:animate-ping" style="animation-delay: 0.3s;"></div>
+                    <div class="absolute top-1/3 left-0 w-0.5 h-0.5 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:animate-ping" style="animation-delay: 0.5s;"></div>
+                </div>
+                
+                <!-- Glowing border that appears on hover -->
+                <div class="absolute inset-0 rounded-full border border-transparent group-hover:border-blue-500/30 dark:group-hover:border-yellow-500/30 transition-all duration-300"></div>
             </button>
         </div>'''
 
@@ -852,15 +953,6 @@ class HTMLReportGenerator:
             background-color: var(--brand-primary-dark);
         }}
         
-        .animate-float {{
-            animation: float 10s ease-in-out infinite;
-        }}
-        
-        @keyframes float {{
-            0%, 100% {{ transform: translateY(0); opacity: 0.05; }}
-            50% {{ transform: translateY(-15px); opacity: 0.1; }}
-        }}
-        
         @keyframes fadein {{
             from {{ opacity: 0; transform: translateY(10px); }}
             to {{ opacity: 1; transform: translateY(0); }}
@@ -899,6 +991,60 @@ class HTMLReportGenerator:
         
         .border-theme {{
             border-color: var(--border-color);
+        }}
+        
+        /* Advanced card animations */
+        .card-3d-effect {{
+            transform-style: preserve-3d;
+            perspective: 1000px;
+            transition: all 0.3s ease;
+        }}
+        
+        .card-3d-effect:hover {{
+            transform: scale(1.05) translateY(-5px) rotateX(2deg) rotateY(2deg);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15), 0 10px 15px rgba(0, 0, 0, 0.08);
+        }}
+        
+        .card-inner {{
+            transform: translateZ(10px);
+            transition: all 0.3s ease;
+        }}
+        
+        @keyframes iconPulse {{
+            0% {{ transform: scale(1); }}
+            50% {{ transform: scale(1.1); }}
+            100% {{ transform: scale(1); }}
+        }}
+        
+        .animate-icon-pulse {{
+            animation: iconPulse 2s ease-in-out infinite;
+        }}
+        
+        @keyframes ping {{
+            0% {{ transform: scale(1); opacity: 1; }}
+            75%, 100% {{ transform: scale(2); opacity: 0; }}
+        }}
+        
+        .animate-ping {{
+            animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }}
+        
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 1; }}
+            50% {{ opacity: 0.5; }}
+        }}
+        
+        .animate-pulse {{
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }}
+        
+        @keyframes float {{
+            0%, 100% {{ transform: translateY(0); opacity: 0.05; }}
+            50% {{ transform: translateY(-15px); opacity: 0.1; }}
+        }}
+        
+        .animate-float {{
+            animation: float 10s ease-in-out infinite;
         }}
     </style>
     <script>
