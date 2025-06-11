@@ -12,6 +12,7 @@ from codelyzer.metrics import FileMetrics, BaseFileMetrics, MetricProvider
 try:
     import tree_sitter_python
     import tree_sitter_javascript
+    import tree_sitter_typescript
     TREE_SITTER_AVAILABLE = True
 except ImportError:
     TREE_SITTER_AVAILABLE = False
@@ -483,20 +484,6 @@ class JavaScriptASTAnalyzer(TreeSitterASTAnalyzer):
 
         traverse(root_node)
         return complexity
-
-
-# Initialize the analyzers
-def initialize_analyzers():
-    """Initialize all tree-sitter analyzers"""
-    if not TREE_SITTER_AVAILABLE:
-        console.print("[yellow]Warning: tree-sitter or language modules not available.[/yellow]")
-        console.print("[yellow]Install them with: pip install tree-sitter tree-sitter-python tree-sitter-javascript[/yellow]")
-        return
-    
-    PythonASTAnalyzer.initialize_parser()
-    JavaScriptASTAnalyzer.initialize_parser()
-    console.print("[green]Initialized tree-sitter parsers for: Python, JavaScript[/green]")
-
 
 if __name__ == "__main__":
     analyzer = JavaScriptASTAnalyzer()
