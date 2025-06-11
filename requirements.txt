@@ -6,3 +6,20 @@ poetry
 tree-sitter
 tree-sitter-python
 tree-sitter-javascript
+# Core requirements
+tree-sitter>=0.20.1
+rich>=12.0.0
+
+# Language modules
+tree-sitter-python>=0.20.1
+tree-sitter-javascript>=0.20.1
+
+# Use tree-sitter-languages for better compatibility
+# This provides pre-compiled versions of tree-sitter language parsers
+# that are tested to work together and avoids version compatibility issues
+tree-sitter-languages>=1.10.0
+
+# Optional: Individual language modules if you prefer
+# Note: These may have version compatibility issues
+# tree-sitter-typescript>=0.20.1
+# tree-sitter-rust>=0.20.1
