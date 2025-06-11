@@ -10,7 +10,7 @@ T = TypeVar('T', bound='ChartData')
 
 class ReportComponent:
     """Base class for HTML report components"""
-    
+
     @staticmethod
     def render(metrics: 'ProjectMetrics') -> str:
         """Render the HTML component"""
@@ -19,7 +19,7 @@ class ReportComponent:
 
 class TableComponent(ReportComponent):
     """Base class for table components"""
-    
+
     @staticmethod
     def render(metrics: 'ProjectMetrics') -> str:
         """Render the table component
@@ -35,7 +35,7 @@ class TableComponent(ReportComponent):
 
 class ChartData:
     """Base class for chart data preparation"""
-    
+
     @staticmethod
     def prepare_data(metrics: 'ProjectMetrics') -> Dict[str, Any]:
         """Prepare data for a chart
@@ -51,7 +51,7 @@ class ChartData:
 
 class LanguageChartData(ChartData):
     """Language distribution chart data"""
-    
+
     @staticmethod
     def prepare_data(metrics: 'ProjectMetrics') -> Dict[str, Any]:
         """Prepare language distribution data
@@ -65,13 +65,13 @@ class LanguageChartData(ChartData):
         languages = metrics.language_distribution
         labels = list(languages.keys())
         values = list(languages.values())
-        
+
         # Sort by value in descending order for better visualization
         sorted_data = sorted(zip(labels, values), key=lambda x: x[1], reverse=True)
-        
+
         # Unpack the sorted data
         sorted_labels, sorted_values = zip(*sorted_data) if sorted_data else ([], [])
-        
+
         return {
             "labels": list(sorted_labels),
             "values": list(sorted_values)
@@ -80,7 +80,7 @@ class LanguageChartData(ChartData):
 
 class ComplexityChartData(ChartData):
     """Complexity distribution chart data"""
-    
+
     @staticmethod
     def prepare_data(metrics: 'ProjectMetrics') -> Dict[str, Any]:
         """Prepare complexity distribution data
@@ -93,11 +93,11 @@ class ComplexityChartData(ChartData):
         """
         complexity_counts = {
             "Low": 0,
-            "Medium": 0, 
+            "Medium": 0,
             "High": 0,
             "Very High": 0
         }
-        
+
         for file_metric in metrics.file_metrics:
             complexity_score = file_metric.complexity_score
             if complexity_score < 10:
@@ -108,7 +108,7 @@ class ComplexityChartData(ChartData):
                 complexity_counts["High"] += 1
             else:
                 complexity_counts["Very High"] += 1
-        
+
         return {
             "labels": list(complexity_counts.keys()),
             "values": list(complexity_counts.values())
@@ -117,7 +117,7 @@ class ComplexityChartData(ChartData):
 
 class SecurityIssuesChartData(ChartData):
     """Security issues chart data"""
-    
+
     @staticmethod
     def prepare_data(metrics: 'ProjectMetrics') -> Dict[str, Any]:
         """Prepare security issues data
@@ -134,7 +134,7 @@ class SecurityIssuesChartData(ChartData):
             "Medium": 0,
             "Low": 0
         }
-        
+
         for file_metric in metrics.file_metrics:
             for issue in file_metric.security_issues:
                 if issue.level == SecurityLevel.CRITICAL:
@@ -145,7 +145,7 @@ class SecurityIssuesChartData(ChartData):
                     security_counts["Medium"] += 1
                 else:
                     security_counts["Low"] += 1
-        
+
         return {
             "labels": list(security_counts.keys()),
             "values": list(security_counts.values()),
@@ -155,7 +155,7 @@ class SecurityIssuesChartData(ChartData):
 
 class CodeSmellsChartData(ChartData):
     """Code smells chart data"""
-    
+
     @staticmethod
     def prepare_data(metrics: 'ProjectMetrics') -> Dict[str, Any]:
         """Prepare code smells data
@@ -171,7 +171,7 @@ class CodeSmellsChartData(ChartData):
             "Major": 0,
             "Minor": 0
         }
-        
+
         for file_metric in metrics.file_metrics:
             for smell in file_metric.code_smells_list:
                 if smell.severity == CodeSmellSeverity.CRITICAL:
@@ -180,7 +180,7 @@ class CodeSmellsChartData(ChartData):
                     smell_counts["Major"] += 1
                 else:
                     smell_counts["Minor"] += 1
-        
+
         return {
             "labels": list(smell_counts.keys()),
             "values": list(smell_counts.values()),
@@ -190,7 +190,7 @@ class CodeSmellsChartData(ChartData):
 
 class ComplexFilesTableComponent(TableComponent):
     """Complex files table component"""
-    
+
     @staticmethod
     def render(metrics: 'ProjectMetrics') -> str:
         """Render the complex files table component
@@ -206,10 +206,10 @@ class ComplexFilesTableComponent(TableComponent):
             # Extract the relative path
             file_path = file_metrics.file_path
             relative_path = file_path.replace(os.getcwd(), "").lstrip(os.sep).replace("\\", "/")
-            
+
             # Count issues
             issues = len(file_metrics.security_issues) + len(file_metrics.code_smells_list)
-            
+
             # Get complexity badge class based on score
             if file_metrics.complexity_score >= 30:
                 complexity_badge = "bg-red-100 text-red-800"
@@ -219,13 +219,13 @@ class ComplexFilesTableComponent(TableComponent):
                 complexity_badge = "bg-yellow-100 text-yellow-800"
             else:
                 complexity_badge = "bg-green-100 text-green-800"
-            
+
             # Format issues display
             if issues > 0:
                 issues_display = f'<span class="text-red-600 font-semibold">{issues}</span>'
             else:
                 issues_display = '<span class="text-green-600">0</span>'
-            
+
             rows += f'''
         <tr class="hover:bg-gray-50 hover:scale-[1.005] transition-all duration-200">
             <td class="px-6 py-4 border-b border-gray-200">
@@ -238,7 +238,7 @@ class ComplexFilesTableComponent(TableComponent):
             <td class="px-6 py-4 border-b border-gray-200"><span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide {complexity_badge}">{file_metrics.complexity_score:.0f}</span></td>
             <td class="px-6 py-4 border-b border-gray-200">{issues_display}</td>
         </tr>'''
-        
+
         return f'''
         <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 h-full">
             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
@@ -261,11 +261,11 @@ class ComplexFilesTableComponent(TableComponent):
                 </table>
             </div>
         </div>'''
-        
-        
+
+
 class DependenciesTableComponent(TableComponent):
     """Dependencies table component"""
-    
+
     @staticmethod
     def render(metrics: 'ProjectMetrics') -> str:
         """Render the dependencies table component
@@ -292,7 +292,7 @@ class DependenciesTableComponent(TableComponent):
                     {dep.license if dep.license else '<span class="text-gray-400">Unknown</span>'}
                 </td>
             </tr>'''
-        
+
         return f'''
         <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 h-full">
             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
@@ -318,7 +318,7 @@ class DependenciesTableComponent(TableComponent):
 
 class PlotReportGenerator:
     """Generate chart visualizations for the HTML report."""
-    
+
     def __init__(self) -> None:
         """Initialize the plot report generator."""
         self.charts_data: Dict[str, Dict[str, Any]] = {}
@@ -328,7 +328,7 @@ class PlotReportGenerator:
             'security': SecurityIssuesChartData,
             'code_smells': CodeSmellsChartData
         }
-    
+
     def prepare_chart_data(self, metrics: 'ProjectMetrics') -> None:
         """Prepare all charts data for plotting.
         
@@ -337,7 +337,7 @@ class PlotReportGenerator:
         """
         for chart_id, chart_class in self.chart_classes.items():
             self.charts_data[chart_id] = chart_class.prepare_data(metrics)
-    
+
     def get_charts_grid_html(self) -> str:
         """Get the HTML grid for all charts.
         
@@ -351,8 +351,9 @@ class PlotReportGenerator:
             {self._get_chart_container_html('security', 'Security Issues', 'bar')}
             {self._get_chart_container_html('code_smells', 'Code Smells', 'bar')}
         </div>'''
-    
-    def _get_chart_container_html(self, chart_id: str, title: str, chart_type: str) -> str:
+
+    @staticmethod
+    def _get_chart_container_html(chart_id: str, title: str, chart_type: str) -> str:
         """Get the HTML container for a single chart.
         
         Args:
@@ -369,9 +370,9 @@ class PlotReportGenerator:
             'security': '<i class="fas fa-shield-alt text-red-500" aria-hidden="true"></i>',
             'code_smells': '<i class="fas fa-bug text-purple-500" aria-hidden="true"></i>'
         }
-        
+
         icon = icon_map.get(chart_id, '<i class="fas fa-chart-pie text-blue-500" aria-hidden="true"></i>')
-        
+
         return f'''
         <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-200 h-full">
             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
@@ -385,7 +386,7 @@ class PlotReportGenerator:
 
 class HeaderComponent(ReportComponent):
     """Header component for HTML report"""
-    
+
     @staticmethod
     def render(metrics: 'ProjectMetrics', timestamp: str) -> str:
         """Render the header HTML section"""
@@ -407,7 +408,7 @@ class HeaderComponent(ReportComponent):
 
 class MetricsGridComponent(ReportComponent):
     """Metrics grid component for HTML report"""
-    
+
     @staticmethod
     def render(metrics: 'ProjectMetrics') -> str:
         """Render the metrics grid HTML section"""
@@ -478,7 +479,7 @@ class MetricsGridComponent(ReportComponent):
 
 class FooterComponent(ReportComponent):
     """Footer component for HTML report"""
-    
+
     @staticmethod
     def render(metrics: 'ProjectMetrics') -> str:
         """Render the footer HTML section"""
@@ -492,14 +493,23 @@ class FooterComponent(ReportComponent):
         </div>'''
 
 
+def format_timestamp() -> str:
+    """Format the current timestamp for display.
+
+    Returns:
+        Formatted timestamp string
+    """
+    return datetime.now().strftime("%B %d, %Y at %H:%M:%S")
+
+
 class HTMLReportGenerator:
     """Generate HTML reports for codebase analysis metrics."""
-    
+
     def __init__(self) -> None:
         """Initialize the HTML report generator."""
         self._timestamp: str = ""
         self._plot_generator = PlotReportGenerator()
-    
+
     def create(self, metrics: 'ProjectMetrics') -> str:
         """Generate HTML report for the given metrics.
         
@@ -511,24 +521,16 @@ class HTMLReportGenerator:
         """
         self._prepare_data(metrics)
         return self._build_html_template(metrics)
-    
+
     def _prepare_data(self, metrics: 'ProjectMetrics') -> None:
         """Prepare all data components for the HTML template.
         
         Args:
             metrics: ProjectMetrics object containing analysis data
         """
-        self._timestamp = self._format_timestamp()
+        self._timestamp = format_timestamp()
         self._plot_generator.prepare_chart_data(metrics)
-    
-    def _format_timestamp(self) -> str:
-        """Format the current timestamp for display.
-        
-        Returns:
-            Formatted timestamp string
-        """
-        return datetime.now().strftime("%B %d, %Y at %H:%M:%S")
-    
+
     def _build_html_template(self, metrics: 'ProjectMetrics') -> str:
         """Build the complete HTML template for the report.
         
@@ -624,7 +626,7 @@ class HTMLReportGenerator:
             JavaScript code for the report
         """
         chart_data_json = json.dumps(self._plot_generator.charts_data)
-        
+
         return f'''
 <script>
     // Chart data from Python
@@ -809,6 +811,7 @@ class HTMLReportGenerator:
         }});
     }});
 </script>'''
+
 
 def generate_direct_html(metrics: 'ProjectMetrics') -> str:
     """Generate HTML directly without using format strings to avoid issues"""

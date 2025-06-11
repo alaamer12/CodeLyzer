@@ -96,10 +96,12 @@ class StandardFileDiscovery:
         languages = self.language_detectors.get(ext, [])
         return languages[0] if languages else None
 
+
 class ProjectMetricsProcessor:
     """Processes project metrics to calculate derived metrics"""
 
-    def process_metrics(self, metrics: ProjectMetrics) -> None:
+    @staticmethod
+    def process_metrics(metrics: ProjectMetrics) -> None:
         """Calculate derived metrics and rankings"""
         if not metrics.file_metrics:
             return
@@ -132,28 +134,29 @@ class Scoring:
         project_metrics.base.total_comments += file_metrics.comments or 0
         project_metrics.base.total_blanks += file_metrics.blanks or 0
         project_metrics.base.project_size += file_metrics.file_size or 0
-        
+
         # Update language statistics
         lang = file_metrics.language
         project_metrics.base.languages[lang] = project_metrics.base.languages.get(lang, 0) + 1
-        
+
         # Update structure metrics
         project_metrics.structure.total_classes += file_metrics.classes or 0
         project_metrics.structure.total_functions += file_metrics.functions or 0
         project_metrics.structure.total_methods += file_metrics.methods or 0
-        
+
         # Track dependencies
         for imp in file_metrics.imports:
             project_metrics.structure.dependencies[imp] = project_metrics.structure.dependencies.get(imp, 0) + 1
-        
+
         return project_metrics
-    
+
     @staticmethod
     def calculate_complexity_distribution(metrics: ProjectMetrics) -> None:
         """Calculate complexity distribution across files"""
         for file_metrics in metrics.file_metrics:
             level = Scoring.determine_complexity_level(file_metrics.complexity_score)
-            metrics.complexity.complexity_distribution[level] = metrics.complexity.complexity_distribution.get(level, 0) + 1
+            metrics.complexity.complexity_distribution[level] = metrics.complexity.complexity_distribution.get(level,
+                                                                                                               0) + 1
 
     @staticmethod
     def determine_complexity_level(score: float) -> ComplexityLevel:
@@ -180,49 +183,52 @@ class Scoring:
         # Calculate security score
         security_issues = sum(len(file_metrics.security_issues) for file_metrics in metrics.file_metrics)
         if security_issues > 0:
-            metrics.security.security_score = max(0, 100 - (security_issues / metrics.total_files * 20))
-        
+            metrics.security.security_score = max(0.0, 100 - (security_issues / metrics.total_files * 20))
+
         # Calculate code quality score (based on code smells and security issues)
-        total_issues = sum(len(file_metrics.security_issues) + len(file_metrics.code_smells_list) 
+        total_issues = sum(len(file_metrics.security_issues) + len(file_metrics.code_smells_list)
                            for file_metrics in metrics.file_metrics)
         if total_issues > 0:
-            metrics.code_quality.code_quality_score = max(0, min(100, int(100 - (total_issues / metrics.total_files * 10))))
+            metrics.code_quality.code_quality_score = max(0, min(100,
+                                                                 int(100 - (total_issues / metrics.total_files * 10))))
         else:
             metrics.code_quality.code_quality_score = 100
 
         # Calculate maintainability score
-        valid_files = [f for f in metrics.file_metrics if hasattr(f.complexity, 'maintainability_index') and f.complexity.maintainability_index > 0]
+        valid_files = [f for f in metrics.file_metrics if
+                       hasattr(f.complexity, 'maintainability_index') and f.complexity.maintainability_index > 0]
         if valid_files:
             avg_maintainability = sum(f.maintainability_index for f in valid_files) / len(valid_files)
             metrics.complexity.maintainability_score = max(0, min(100, int(avg_maintainability)))
             metrics.complexity.avg_maintainability_index = avg_maintainability
-        
+
         # Calculate average cyclomatic complexity
         valid_cc_files = [f for f in metrics.file_metrics if f.cyclomatic_complexity > 0]
         if valid_cc_files:
-            metrics.complexity.avg_cyclomatic_complexity = sum(f.cyclomatic_complexity for f in valid_cc_files) / len(valid_cc_files)
-    
+            metrics.complexity.avg_cyclomatic_complexity = sum(f.cyclomatic_complexity for f in valid_cc_files) / len(
+                valid_cc_files)
+
     @staticmethod
     def identify_hotspots(metrics: ProjectMetrics) -> None:
         """Identify code hotspots based on complexity and issues"""
         # Sort files by complexity
         sorted_by_complexity = sorted(metrics.file_metrics, key=lambda f: f.complexity_score, reverse=True)
-        
+
         # Get most complex files
         metrics.complexity.most_complex_files = [f.file_path for f in sorted_by_complexity[:10]]
-        
+
         # Get largest files
         sorted_by_size = sorted(metrics.file_metrics, key=lambda f: f.file_size, reverse=True)
         metrics.code_quality.largest_files = [f.file_path for f in sorted_by_size[:10]]
-        
+
         # Identify hotspots (complex + security issues or code smells)
         hotspots = []
         for file_metrics in metrics.file_metrics:
-            if (file_metrics.complexity_score > 200 and 
-                (len(file_metrics.security_issues) > 0 or len(file_metrics.code_smells_list) > 0)):
+            if (file_metrics.complexity_score > 200 and
+                    (len(file_metrics.security_issues) > 0 or len(file_metrics.code_smells_list) > 0)):
                 hotspots.append(file_metrics.file_path)
         metrics.code_quality.hotspots = hotspots[:10]  # Top 10 hotspots
-    
+
     @staticmethod
     def calculate_security_summary(metrics: ProjectMetrics) -> None:
         """Calculate security summary statistics"""
@@ -230,14 +236,14 @@ class Scoring:
             for issue in file_metrics.security_issues:
                 level = issue.get('level', SecurityLevel.MEDIUM_RISK)
                 metrics.security.security_summary[level] = metrics.security.security_summary.get(level, 0) + 1
-                
+
                 # Track critical vulnerabilities
                 if level == SecurityLevel.CRITICAL:
                     metrics.security.critical_vulnerabilities.append({
                         'file': file_metrics.file_path,
                         'issue': issue
                     })
-    
+
     @staticmethod
     def process_metrics(project_metrics: ProjectMetrics) -> ProjectMetrics:
         """Process all metrics and calculate derived values"""

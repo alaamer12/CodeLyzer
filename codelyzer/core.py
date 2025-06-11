@@ -11,19 +11,19 @@ from typing import Dict, List, Optional, Set
 
 import pandas as pd
 
-from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
-from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, TIMEOUT_SECONDS
-from codelyzer.metrics import FileMetrics, ProjectMetrics
-from codelyzer.console import console, create_analysis_progress_bar
 from codelyzer.analyzers import SecurityAnalyzer, CodeSmellAnalyzer, ComplexityAnalyzer, \
     PatternBasedAnalyzer
+from codelyzer.ast_analyzers import ASTAnalyzer, PythonASTAnalyzer, JavaScriptASTAnalyzer
+from codelyzer.config import DEFAULT_EXCLUDED_DIRS, LANGUAGE_CONFIGS, TIMEOUT_SECONDS
+from codelyzer.console import console, create_analysis_progress_bar
 from codelyzer.helpers import StandardFileDiscovery, ProjectMetricsProcessor, Scoring
+from codelyzer.metrics import FileMetrics, ProjectMetrics
 from codelyzer.utils import FunctionWithTimeout
 
 
 def register_metric_providers() -> None:
     """Register all metric providers to the ASTAnalyzer base class"""
-    
+
     # Register each provider
     ASTAnalyzer.register_metric_provider(SecurityAnalyzer())
     ASTAnalyzer.register_metric_provider(ComplexityAnalyzer())
@@ -55,7 +55,6 @@ def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
     # analyzers['java'] = JavaASTAnalyzer()
 
     return analyzers
-
 
 
 def get_file_size(file_path: str) -> int:
@@ -124,7 +123,7 @@ class AdvancedCodeAnalyzer:
         return language is not None
 
     def _get_file_metrics_and_content(self, file_path: str, language: str, file_size: int) -> tuple[
-        Optional[FileMetrics], Optional[str]]:
+                                    Optional[FileMetrics], Optional[str]]:
         """Get metrics and content for a file using appropriate analyzer"""
         analyzer = self.language_analyzers.get(language)
         content = None

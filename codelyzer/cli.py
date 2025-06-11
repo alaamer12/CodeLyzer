@@ -18,6 +18,7 @@ app = typer.Typer(
     rich_markup_mode="rich"
 )
 
+
 def validate_project_path(path: str) -> Path:
     """Validate the provided path and return a Path object."""
     project_path = Path(path).resolve()
