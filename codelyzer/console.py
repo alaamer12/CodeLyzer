@@ -2,24 +2,134 @@
 Console and display utilities for CodeLyzer.
 Centralizes all console output, logging, progress bars, and rich display components.
 """
+import functools
+import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Callable, TypeVar, cast
 
 from rich import box
+from rich.box import Box
 from rich.console import Console
 from rich.layout import Layout
+from rich.logging import RichHandler
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.table import Table
-from rich.box import Box
+from rich.traceback import install as install_rich_traceback
 
+from codelyzer.config import DEBUG, LOG_FILENAME
 from codelyzer.metrics import ProjectMetrics, ComplexityLevel
 
-# Main console instance used throughout the application
+# Install rich traceback handler for better exception visualization
+install_rich_traceback()
+
+# Configure the rich console for standard output
 console = Console()
 
+# Configure rich handler for console output
+rich_handler = RichHandler(
+    console=console,
+    rich_tracebacks=True,
+    markup=True,
+    show_time=True,
+    show_level=True,
+    show_path=True
+)
 
+# Configure file handler for log file output
+file_handler = logging.FileHandler(LOG_FILENAME, mode="w", encoding="utf-8")
+file_handler.setFormatter(
+    logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] [%(module)s:%(lineno)d] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+)
+
+# Configure root logger
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[rich_handler, file_handler],
+    format="%(message)s",  # The rich handler will handle the formatting for console
+)
+
+# Create dedicated logger for CodeLyzer
+logger = logging.getLogger("codelyzer")
+logger.setLevel(logging.DEBUG if DEBUG else logging.INFO)
+
+# Function return type for decorator
+F = TypeVar('F', bound=Callable[..., Any])
+
+
+def debug_log(message: str) -> None:
+    """Log a debug message if DEBUG mode is enabled.
+    
+    Args:
+        message: The debug message to log
+    """
+    if DEBUG:
+        logger.debug(message)
+
+
+def debug(func: F) -> F:
+    """Decorator to log function entry, exit, and execution time if DEBUG is True.
+    
+    Args:
+        func: The function to decorate
+        
+    Returns:
+        The decorated function
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not DEBUG:
+            return func(*args, **kwargs)
+
+        # Log function entry with arguments
+        arg_str = ", ".join([str(a) for a in args])
+        kwarg_str = ", ".join([f"{k}={v}" for k, v in kwargs.items()])
+        params = ", ".join(filter(None, [arg_str, kwarg_str]))
+        logger.debug(f"ENTER: {func.__name__}({params})")
+
+        # Track execution time
+        start_time = datetime.now()
+
+        try:
+            result = func(*args, **kwargs)
+            logger.debug(f"EXIT: {func.__name__} -> {result if result is not None else 'None'}")
+            return result
+        except Exception as e:
+            logger.debug(f"ERROR in {func.__name__}: {str(e)}")
+            raise
+        finally:
+            execution_time = (datetime.now() - start_time).total_seconds()
+            logger.debug(f"TIME: {func.__name__} took {execution_time:.4f}s")
+
+    return cast(F, wrapper)
+
+
+def set_log_level(level: int) -> None:
+    """Set the log level for the codelyzer logger.
+    
+    Args:
+        level: The log level to set (e.g., logging.DEBUG, logging.INFO)
+    """
+    logger.setLevel(level)
+    logger.info(f"Log level set to {logging.getLevelName(level)}")
+
+
+def get_log_file_path() -> Path:
+    """Get the current log file path.
+    
+    Returns:
+        Path object pointing to the current log file
+    """
+    return LOG_FILENAME
+
+
+@debug
 def create_summary_panel(metrics: ProjectMetrics) -> Panel:
     """Create a summary panel with project metrics."""
     summary_text = f"""
@@ -41,6 +151,7 @@ def create_summary_panel(metrics: ProjectMetrics) -> Panel:
 • Analysis time: {metrics.analysis_duration:.2f}s
 """
 
+    logger.info(f"Created summary panel with {metrics.total_files} files and {metrics.total_loc} lines")
     return Panel(
         Markdown(summary_text),
         title="📋 Analysis Summary",
@@ -51,6 +162,7 @@ def create_summary_panel(metrics: ProjectMetrics) -> Panel:
     )
 
 
+@debug
 def create_language_distribution_table(metrics: ProjectMetrics) -> Table:
     """Create a table showing language distribution."""
     table = Table(
@@ -73,9 +185,11 @@ def create_language_distribution_table(metrics: ProjectMetrics) -> Table:
             f"{percentage:.1f}%"
         )
 
+    logger.info(f"Created language distribution table with {len(metrics.languages)} languages")
     return table
 
 
+@debug
 def create_complexity_table(metrics: ProjectMetrics) -> Table:
     """Create a table showing code complexity distribution."""
     table = Table(
@@ -110,11 +224,14 @@ def create_complexity_table(metrics: ProjectMetrics) -> Table:
             f"[{style}]{percentage:.1f}%[/{style}]"
         )
 
+    logger.info(f"Created complexity table with distribution across {len(ComplexityLevel)} levels")
     return table
 
 
+@debug
 def create_table(title: str, box: Box, title_style: str, border_style: str, highlight: bool) -> Table:
     """Create a table with the given parameters."""
+    logger.debug(f"Creating table with title: {title}")
     return Table(
         title=title,
         box=box,
@@ -124,8 +241,10 @@ def create_table(title: str, box: Box, title_style: str, border_style: str, high
     )
 
 
+@debug
 def create_table_columns(table: Table, columns: Dict[str, Dict[str, Any]]) -> Table:
     """Update a table with the given columns."""
+    logger.debug(f"Adding {len(columns)} columns to table")
     for column_name, column_config in columns.items():
         table.add_column(column_name, **column_config)
     return table
@@ -151,7 +270,8 @@ def _get_file_relative_path(file_path: str) -> str:
             relative_path = str(Path(path_obj.parent.name) / path_obj.name)
         else:
             relative_path = path_obj.name
-    
+
+    debug_log(f"Resolved file path '{file_path}' to relative path '{relative_path}'")
     return relative_path
 
 
@@ -209,9 +329,12 @@ def _build_file_metrics_map(metrics: ProjectMetrics) -> Dict[str, Any]:
     Returns:
         Dictionary mapping file paths to FileMetrics objects
     """
-    return {fm.file_path: fm for fm in metrics.file_metrics}
+    file_map = {fm.file_path: fm for fm in metrics.file_metrics}
+    debug_log(f"Built file metrics map with {len(file_map)} entries")
+    return file_map
 
 
+@debug
 def create_hotspots_table(metrics: ProjectMetrics) -> Table:
     """Create a table showing code hotspots (most complex files)."""
     table = create_table(
@@ -221,7 +344,7 @@ def create_hotspots_table(metrics: ProjectMetrics) -> Table:
         border_style="cyan",
         highlight=True
     )
-    
+
     columns = _create_hotspots_table_columns()
     create_table_columns(table, columns)
 
@@ -229,6 +352,9 @@ def create_hotspots_table(metrics: ProjectMetrics) -> Table:
     file_metrics_map = _build_file_metrics_map(metrics)
 
     # Loop through the most complex file paths and find their corresponding FileMetrics objects
+    hotspot_count = min(10, len(metrics.most_complex_files))
+    logger.info(f"Adding {hotspot_count} files to hotspots table")
+
     for file_path in metrics.most_complex_files[:10]:
         # Get the FileMetrics object for this file path
         file_metrics = file_metrics_map.get(file_path)
@@ -248,6 +374,7 @@ def create_hotspots_table(metrics: ProjectMetrics) -> Table:
     return table
 
 
+@debug
 def create_dependencies_table(metrics: ProjectMetrics) -> Table:
     """Create a table showing top dependencies."""
     table = Table(
@@ -262,14 +389,18 @@ def create_dependencies_table(metrics: ProjectMetrics) -> Table:
 
     # Get top 15 dependencies
     top_deps = sorted(metrics.structure.dependencies.items(), key=lambda x: x[1], reverse=True)[:15]
+    logger.info(f"Adding {len(top_deps)} dependencies to table")
 
     for module, count in top_deps:
         table.add_row(module, str(count))
 
     return table
 
+
+@debug
 def create_finding_files_progress_bar() -> Progress:
     """Create undetermind progress bar for finding files."""
+    logger.debug("Creating progress bar for file discovery")
     return Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]Finding files...", justify="right"),
@@ -277,8 +408,10 @@ def create_finding_files_progress_bar() -> Progress:
     )
 
 
+@debug
 def create_analysis_progress_bar() -> Progress:
     """Create a standardized progress bar for analysis operations."""
+    logger.debug("Creating progress bar for analysis")
     return Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]Processing...", justify="right"),
@@ -294,8 +427,10 @@ def create_analysis_progress_bar() -> Progress:
     )
 
 
+@debug
 def create_and_display_layout(metrics: ProjectMetrics) -> None:
     """Create and display the layout with all metric tables."""
+    logger.info("Creating and displaying layout with metric tables")
     layout = Layout()
     layout.split_column(
         Layout(name="top"),
@@ -315,8 +450,13 @@ def create_and_display_layout(metrics: ProjectMetrics) -> None:
     console.print(layout)
 
 
+@debug
 def display_initial_info(project_path: Path, exclude: List[str], include_tests: bool) -> None:
     """Display initial information about the analysis."""
+    logger.info(f"Starting analysis of project: {project_path}")
+    logger.info(f"Exclusions: {', '.join(exclude) if exclude else 'None'}")
+    logger.info(f"Including tests: {include_tests}")
+
     console.print(Panel.fit(
         f"🔍 [bold blue]Advanced Codebase Analysis[/bold blue]\n"
         f"📁 Project: [cyan]{project_path.name}[/cyan]\n"
@@ -331,8 +471,15 @@ def display_initial_info(project_path: Path, exclude: List[str], include_tests: 
         console.print("[yellow]🧪 Including test directories[/yellow]")
 
 
+@debug
 def display_final_summary(metrics: ProjectMetrics) -> None:
     """Display the final analysis summary."""
+    logger.info("Analysis complete")
+    logger.info(f"Code Quality Score: {metrics.code_quality_score:.1f}/100")
+    logger.info(f"Maintainability Score: {metrics.maintainability_score:.1f}/100")
+    logger.info(f"Analysis Duration: {metrics.analysis_duration:.2f}s")
+    logger.info(f"Log file saved to: {LOG_FILENAME}")
+
     console.rule("[bold green]🎉 Analysis Complete")
 
     quality_emoji = "🟢" if metrics.code_quality_score >= 80 else "🟡" if metrics.code_quality_score >= 60 else "🔴"
@@ -344,11 +491,14 @@ def display_final_summary(metrics: ProjectMetrics) -> None:
 {maintainability_emoji} Maintainability: {metrics.maintainability_score:.1f}/100
 ⏱️  Analysis completed in {metrics.analysis_duration:.2f} seconds
 🎯 Focus on the {len(metrics.most_complex_files)} most complex files for maximum impact
+📝 Log file: {LOG_FILENAME}
 """)
 
 
+@debug
 def display_verbose_info(metrics: ProjectMetrics) -> None:
     """Display additional verbose information."""
+    logger.info("Displaying verbose analysis information")
     console.rule("[bold blue]📊 Detailed Analysis")
 
     # File size distribution
@@ -370,9 +520,13 @@ def display_verbose_info(metrics: ProjectMetrics) -> None:
     display_security_issues(metrics)
 
 
+@debug
 def display_security_issues(metrics: ProjectMetrics) -> None:
     """Display security issues if any exist."""
     from collections import Counter
+
+    security_issues = sum(len(f.security_issues) for f in metrics.file_metrics)
+    logger.info(f"Found {security_issues} security issues")
 
     if any(f.security_issues for f in metrics.file_metrics):
         security_table = Table(title="🔒 Security Issues", box=box.ROUNDED)
