@@ -1,4 +1,6 @@
+from datetime import datetime
 import os
+from pathlib import Path
 import platform
 
 # Language configurations
@@ -187,3 +189,13 @@ MAX_REPO_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
 IS_WINDOWS = platform.system() == 'Windows'
 PARSE_TIMEOUT = 30
 GRAMMAR_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "build")
+
+# Logging configuration
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(exist_ok=True)
+
+# Generate log filename based on current date/time
+LOG_FILENAME = LOG_DIR / f"codelyzer_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+# Debug flag - can be toggled via environment variable
+DEBUG = os.environ.get("CODELYZER_DEBUG", "").lower() in ("true", "1", "yes")
