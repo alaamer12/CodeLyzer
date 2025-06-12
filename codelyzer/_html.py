@@ -350,9 +350,22 @@ class ComplexFilesTableComponent(TableComponent):
 
         # Create a mapping of file paths to file metrics for quick lookup
         file_metrics_map = {fm.file_path: fm for fm in metrics.file_metrics}
+        
+        # Ensure we have the most complex files
+        # If most_complex_files is empty or doesn't have enough entries, recreate it based on complexity score
+        if len(metrics.most_complex_files) < 15:
+            # Sort files by complexity score in descending order
+            sorted_files = sorted(metrics.file_metrics, key=lambda f: f.complexity_score, reverse=True)
+            most_complex = [f.file_path for f in sorted_files[:15]]
+            
+            # Use these sorted files for display
+            display_files = most_complex
+        else:
+            # Use the existing most_complex_files but ensure we only show the top 15
+            display_files = metrics.most_complex_files[:15]
 
         # Loop through the most complex file paths and find corresponding FileMetrics objects
-        for file_path in metrics.most_complex_files[:15]:
+        for file_path in display_files:
             # Get the FileMetrics object for this file path
             file_metrics = file_metrics_map.get(file_path)
 
@@ -381,8 +394,9 @@ class ComplexFilesTableComponent(TableComponent):
             else:
                 issues_display = '<span class="text-green-600 dark:text-green-400">0</span>'
 
+            # Add data attributes for sorting
             rows += f'''
-        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 hover:scale-[1.005] transition-all duration-200">
+        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 hover:scale-[1.005] transition-all duration-200" data-complexity="{file_metrics.complexity_score}" data-loc="{file_metrics.sloc}">
             <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <div class="flex items-center gap-2 font-mono text-sm text-gray-600 dark:text-gray-400 max-w-xs overflow-hidden text-ellipsis whitespace-nowrap bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-700" title="{relative_path}">
                     <i class="fas fa-file-code" aria-hidden="true"></i>
@@ -394,6 +408,7 @@ class ComplexFilesTableComponent(TableComponent):
             <td class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">{issues_display}</td>
         </tr>'''
 
+        # Add sortable class and click handlers to the table headers
         return f'''
         <div class="bg-card p-6 rounded-2xl shadow-md border border-theme h-full">
             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2 text-body">
@@ -401,12 +416,18 @@ class ComplexFilesTableComponent(TableComponent):
                 Most Complex Files
             </h3>
             <div class="overflow-x-auto">
-                <table class="min-w-full">
+                <table class="min-w-full complex-files-table" id="complex-files-table">
                     <thead>
                         <tr>
                             <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">File</th>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">LOC</th>
-                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Complexity</th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider sortable cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800" data-sort="loc">
+                                LOC
+                                <i class="fas fa-sort ml-1 text-gray-400"></i>
+                            </th>
+                            <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider sortable cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800" data-sort="complexity">
+                                Complexity
+                                <i class="fas fa-sort-down ml-1 text-blue-500"></i>
+                            </th>
                             <th class="px-6 py-3 border-b-2 border-gray-300 dark:border-gray-700 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Issues</th>
                         </tr>
                     </thead>
@@ -1405,7 +1426,75 @@ class HTMLReportGenerator:
             window.chartInstances = window.chartInstances || {{}};
             window.chartInstances[dataKey] = chart;
         }});
+
+        // Set up table sorting functionality
+        setupTableSorting();
     }});
+    
+    // Table sorting functionality
+    function setupTableSorting() {{
+        const table = document.getElementById('complex-files-table');
+        if (!table) return;
+        
+        const headers = table.querySelectorAll('th.sortable');
+        const tbody = table.querySelector('tbody');
+        
+        // Sort by complexity by default (descending)
+        sortTableByColumn(tbody, 'complexity', true);
+        
+        headers.forEach(header => {{
+            header.addEventListener('click', () => {{
+                const sortKey = header.getAttribute('data-sort');
+                
+                // Toggle sort direction if clicking the same header again
+                let isDescending = true;
+                if (header.querySelector('.fa-sort-down')) {{
+                    isDescending = false;
+                }}
+                
+                // Reset all header icons
+                headers.forEach(h => {{
+                    const icon = h.querySelector('i');
+                    if (icon) {{
+                        icon.className = 'fas fa-sort ml-1 text-gray-400';
+                    }}
+                }});
+                
+                // Update clicked header icon
+                const icon = header.querySelector('i');
+                if (icon) {{
+                    icon.className = isDescending 
+                        ? 'fas fa-sort-down ml-1 text-blue-500' 
+                        : 'fas fa-sort-up ml-1 text-blue-500';
+                }}
+                
+                // Sort the table
+                sortTableByColumn(tbody, sortKey, isDescending);
+            }});
+        }});
+    }}
+    
+    function sortTableByColumn(tbody, column, isDescending = true) {{
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        
+        // Sort rows based on the selected column
+        const sortedRows = rows.sort((a, b) => {{
+            const aValue = parseFloat(a.getAttribute(`data-${{column}}`)) || 0;
+            const bValue = parseFloat(b.getAttribute(`data-${{column}}`)) || 0;
+            
+            return isDescending ? bValue - aValue : aValue - bValue;
+        }});
+        
+        // Clear table body
+        while (tbody.firstChild) {{
+            tbody.removeChild(tbody.firstChild);
+        }}
+        
+        // Append sorted rows
+        sortedRows.forEach(row => {{
+            tbody.appendChild(row);
+        }});
+    }}
 </script>'''
 
     def _get_theme_javascript(self) -> str:
