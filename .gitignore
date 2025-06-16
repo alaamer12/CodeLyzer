@@ -11,6 +11,7 @@ desktop.ini
 *.njsproj
 *.sln
 *.swp
+*.psd
 *~
 .idea/*
 reports/*
