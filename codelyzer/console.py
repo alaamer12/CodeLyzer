@@ -7,11 +7,13 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Dict, Callable, TypeVar, cast
+from typing import Any, List, Dict, Callable, TypeVar, cast
 
 from rich import box
 from rich.box import Box
 from rich.console import Console
 from rich.layout import Layout
+from rich.logging import RichHandler
 from rich.logging import RichHandler
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -152,6 +154,7 @@ def create_summary_panel(metrics: ProjectMetrics) -> Panel:
 """
 
     logger.info(f"Created summary panel with {metrics.total_files} files and {metrics.total_loc} lines")
+    logger.info(f"Created summary panel with {metrics.total_files} files and {metrics.total_loc} lines")
     return Panel(
         Markdown(summary_text),
         title="📋 Analysis Summary",
@@ -232,6 +235,7 @@ def create_complexity_table(metrics: ProjectMetrics) -> Table:
 def create_table(title: str, box: Box, title_style: str, border_style: str, highlight: bool) -> Table:
     """Create a table with the given parameters."""
     logger.debug(f"Creating table with title: {title}")
+    logger.debug(f"Creating table with title: {title}")
     return Table(
         title=title,
         box=box,
@@ -245,10 +249,10 @@ def create_table(title: str, box: Box, title_style: str, border_style: str, high
 def create_table_columns(table: Table, columns: Dict[str, Dict[str, Any]]) -> Table:
     """Update a table with the given columns."""
     logger.debug(f"Adding {len(columns)} columns to table")
+    logger.debug(f"Adding {len(columns)} columns to table")
     for column_name, column_config in columns.items():
         table.add_column(column_name, **column_config)
     return table
-
 
 def _get_file_relative_path(file_path: str) -> str:
     """Get a readable relative path for display.
@@ -274,7 +278,6 @@ def _get_file_relative_path(file_path: str) -> str:
     debug_log(f"Resolved file path '{file_path}' to relative path '{relative_path}'")
     return relative_path
 
-
 def _get_issue_style(issue_count: int) -> str:
     """Determine the style color based on issue count.
 
@@ -291,7 +294,6 @@ def _get_issue_style(issue_count: int) -> str:
     else:
         return "red"
 
-
 def _get_issue_display(issue_count: int, style: str) -> str:
     """Format the issue display with appropriate styling.
 
@@ -304,7 +306,6 @@ def _get_issue_display(issue_count: int, style: str) -> str:
     """
     display_text = "✅" if issue_count == 0 else str(issue_count)
     return f"[{style}]{display_text}[/{style}]"
-
 
 def _create_hotspots_table_columns() -> Dict[str, Dict[str, Any]]:
     """Define the columns for the hotspots table.
@@ -319,7 +320,6 @@ def _create_hotspots_table_columns() -> Dict[str, Dict[str, Any]]:
         "issues": {"justify": "right", "style": "yellow"}
     }
 
-
 def _build_file_metrics_map(metrics: ProjectMetrics) -> Dict[str, Any]:
     """Create a mapping of file paths to their metrics for quick lookup.
 
@@ -329,6 +329,9 @@ def _build_file_metrics_map(metrics: ProjectMetrics) -> Dict[str, Any]:
     Returns:
         Dictionary mapping file paths to FileMetrics objects
     """
+    file_map = {fm.file_path: fm for fm in metrics.file_metrics}
+    debug_log(f"Built file metrics map with {len(file_map)} entries")
+    return file_map
     file_map = {fm.file_path: fm for fm in metrics.file_metrics}
     debug_log(f"Built file metrics map with {len(file_map)} entries")
     return file_map
@@ -390,6 +393,7 @@ def create_dependencies_table(metrics: ProjectMetrics) -> Table:
     # Get top 15 dependencies
     top_deps = sorted(metrics.structure.dependencies.items(), key=lambda x: x[1], reverse=True)[:15]
     logger.info(f"Adding {len(top_deps)} dependencies to table")
+    logger.info(f"Adding {len(top_deps)} dependencies to table")
 
     for module, count in top_deps:
         table.add_row(module, str(count))
@@ -401,6 +405,7 @@ def create_dependencies_table(metrics: ProjectMetrics) -> Table:
 def create_finding_files_progress_bar() -> Progress:
     """Create undetermind progress bar for finding files."""
     logger.debug("Creating progress bar for file discovery")
+    logger.debug("Creating progress bar for file discovery")
     return Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]Finding files...", justify="right"),
@@ -411,6 +416,7 @@ def create_finding_files_progress_bar() -> Progress:
 @debug
 def create_analysis_progress_bar() -> Progress:
     """Create a standardized progress bar for analysis operations."""
+    logger.debug("Creating progress bar for analysis")
     logger.debug("Creating progress bar for analysis")
     return Progress(
         SpinnerColumn(),
@@ -430,6 +436,7 @@ def create_analysis_progress_bar() -> Progress:
 @debug
 def create_and_display_layout(metrics: ProjectMetrics) -> None:
     """Create and display the layout with all metric tables."""
+    logger.info("Creating and displaying layout with metric tables")
     logger.info("Creating and displaying layout with metric tables")
     layout = Layout()
     layout.split_column(
@@ -496,6 +503,7 @@ def display_final_summary(metrics: ProjectMetrics) -> None:
 ⏱️  Analysis completed in {metrics.analysis_duration:.2f} seconds
 🎯 Focus on the {len(metrics.most_complex_files)} most complex files for maximum impact
 📝 Log file: {LOG_FILENAME}
+📝 Log file: {LOG_FILENAME}
 """)
     
     return None
@@ -504,6 +512,7 @@ def display_final_summary(metrics: ProjectMetrics) -> None:
 @debug
 def display_verbose_info(metrics: ProjectMetrics) -> None:
     """Display additional verbose information."""
+    logger.info("Displaying verbose analysis information")
     logger.info("Displaying verbose analysis information")
     console.rule("[bold blue]📊 Detailed Analysis")
 
@@ -532,6 +541,9 @@ def display_verbose_info(metrics: ProjectMetrics) -> None:
 def display_security_issues(metrics: ProjectMetrics) -> None:
     """Display security issues if any exist."""
     from collections import Counter
+
+    security_issues = sum(len(f.security_issues) for f in metrics.file_metrics)
+    logger.info(f"Found {security_issues} security issues")
 
     security_issues = sum(len(f.security_issues) for f in metrics.file_metrics)
     logger.info(f"Found {security_issues} security issues")

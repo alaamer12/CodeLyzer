@@ -1,6 +1,7 @@
 from typing import Any, Dict
 
 from codelyzer.console import logger, debug, debug_log
+from codelyzer.console import logger, debug, debug_log
 from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider, SecurityLevel
 
 
@@ -13,13 +14,21 @@ class SecurityAnalyzer(MetricProvider):
         logger.debug("SecurityAnalyzer initialized")
 
     @debug
+    def __init__(self) -> None:
+        """Initialize security analyzer"""
+        super().__init__()
+        logger.debug("SecurityAnalyzer initialized")
+
+    @debug
     def analyze_file(self, file_metrics: FileMetrics, file_content: str, ast_data: Any) -> None:
         """Analyze file for security issues and update metrics"""
         language = file_metrics.language
         logger.debug(f"Analyzing security issues in {file_metrics.file_path} ({language})")
+        logger.debug(f"Analyzing security issues in {file_metrics.file_path} ({language})")
 
         # Skip if content is empty
         if not file_content:
+            logger.debug(f"Skipping security analysis for {file_metrics.file_path} - empty content")
             logger.debug(f"Skipping security analysis for {file_metrics.file_path} - empty content")
             return
 
@@ -30,8 +39,11 @@ class SecurityAnalyzer(MetricProvider):
             self._analyze_js_security(file_metrics, file_content, ast_data)
         else:
             debug_log(f"No specific security analyzer for language: {language}")
+        else:
+            debug_log(f"No specific security analyzer for language: {language}")
         # Add other languages as needed
 
+    @debug
     @debug
     def analyze_project(self, project_metrics: ProjectMetrics) -> None:
         """Analyze project-level security metrics"""
@@ -85,6 +97,7 @@ class SecurityAnalyzer(MetricProvider):
     def _check_for_os_command_injection(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for OS command injection vulnerabilities"""
         debug_log(f"Checking for OS command injection in {file_metrics.file_path}")
+        debug_log(f"Checking for OS command injection in {file_metrics.file_path}")
         patterns = [
             r"os\.system\((?!['\"]\w+['\"])[^\)]*\)",
             r"subprocess\.call\((?!['\"]\w+['\"])[^\)]*\)",
@@ -93,11 +106,13 @@ class SecurityAnalyzer(MetricProvider):
         ]
 
         issues_found = 0
+        issues_found = 0
         for pattern in patterns:
             import re
             matches = re.finditer(pattern, file_content)
             for match in matches:
                 location = self._get_line_number(file_content, match.start())
+                debug_log(f"Found OS command injection at line {location['line']}: {match.group(0)}")
                 debug_log(f"Found OS command injection at line {location['line']}: {match.group(0)}")
                 self._add_vulnerability(
                     file_metrics,
@@ -114,6 +129,7 @@ class SecurityAnalyzer(MetricProvider):
     def _check_for_sql_injection(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for SQL injection vulnerabilities"""
         debug_log(f"Checking for SQL injection in {file_metrics.file_path}")
+        debug_log(f"Checking for SQL injection in {file_metrics.file_path}")
         patterns = [
             r"execute\([^,]*\+[^\)]*\)",
             r"execute\([^,]*%[^\)]*\)",
@@ -122,11 +138,13 @@ class SecurityAnalyzer(MetricProvider):
         ]
 
         issues_found = 0
+        issues_found = 0
         for pattern in patterns:
             import re
             matches = re.finditer(pattern, file_content)
             for match in matches:
                 location = self._get_line_number(file_content, match.start())
+                debug_log(f"Found SQL injection at line {location['line']}: {match.group(0)}")
                 debug_log(f"Found SQL injection at line {location['line']}: {match.group(0)}")
                 self._add_vulnerability(
                     file_metrics,
@@ -143,13 +161,16 @@ class SecurityAnalyzer(MetricProvider):
     def _check_for_eval(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for unsafe eval() usage in JavaScript"""
         debug_log(f"Checking for unsafe eval() in {file_metrics.file_path}")
+        debug_log(f"Checking for unsafe eval() in {file_metrics.file_path}")
         pattern = r"eval\([^\)]+\)"
 
         import re
         matches = re.finditer(pattern, file_content)
         issues_found = 0
+        issues_found = 0
         for match in matches:
             location = self._get_line_number(file_content, match.start())
+            debug_log(f"Found unsafe eval() at line {location['line']}: {match.group(0)}")
             debug_log(f"Found unsafe eval() at line {location['line']}: {match.group(0)}")
             self._add_vulnerability(
                 file_metrics,
@@ -166,13 +187,16 @@ class SecurityAnalyzer(MetricProvider):
     def _check_for_document_write(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for unsafe document.write usage in JavaScript"""
         debug_log(f"Checking for document.write in {file_metrics.file_path}")
+        debug_log(f"Checking for document.write in {file_metrics.file_path}")
         pattern = r"document\.write\([^\)]+\)"
 
         import re
         matches = re.finditer(pattern, file_content)
         issues_found = 0
+        issues_found = 0
         for match in matches:
             location = self._get_line_number(file_content, match.start())
+            debug_log(f"Found document.write() at line {location['line']}: {match.group(0)}")
             debug_log(f"Found document.write() at line {location['line']}: {match.group(0)}")
             self._add_vulnerability(
                 file_metrics,
@@ -189,13 +213,16 @@ class SecurityAnalyzer(MetricProvider):
     def _check_for_innerhtml(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for unsafe innerHTML usage in JavaScript"""
         debug_log(f"Checking for innerHTML in {file_metrics.file_path}")
+        debug_log(f"Checking for innerHTML in {file_metrics.file_path}")
         pattern = r"\.innerHTML\s*=\s*[^;]+"
 
         import re
         matches = re.finditer(pattern, file_content)
         issues_found = 0
+        issues_found = 0
         for match in matches:
             location = self._get_line_number(file_content, match.start())
+            debug_log(f"Found innerHTML usage at line {location['line']}: {match.group(0)}")
             debug_log(f"Found innerHTML usage at line {location['line']}: {match.group(0)}")
             self._add_vulnerability(
                 file_metrics,
@@ -212,6 +239,7 @@ class SecurityAnalyzer(MetricProvider):
     def _check_for_insecure_deserialization(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for insecure deserialization"""
         debug_log(f"Checking for insecure deserialization in {file_metrics.file_path}")
+        debug_log(f"Checking for insecure deserialization in {file_metrics.file_path}")
         patterns = [
             r"pickle\.loads\(",
             r"pickle\.load\(",
@@ -220,11 +248,13 @@ class SecurityAnalyzer(MetricProvider):
         ]
 
         issues_found = 0
+        issues_found = 0
         for pattern in patterns:
             import re
             matches = re.finditer(pattern, file_content)
             for match in matches:
                 location = self._get_line_number(file_content, match.start())
+                debug_log(f"Found insecure deserialization at line {location['line']}: {match.group(0)}")
                 debug_log(f"Found insecure deserialization at line {location['line']}: {match.group(0)}")
                 self._add_vulnerability(
                     file_metrics,
@@ -241,6 +271,7 @@ class SecurityAnalyzer(MetricProvider):
     def _check_for_hardcoded_secrets(self, file_metrics: FileMetrics, file_content: str) -> None:
         """Check for hardcoded secrets in code"""
         debug_log(f"Checking for hardcoded secrets in {file_metrics.file_path}")
+        debug_log(f"Checking for hardcoded secrets in {file_metrics.file_path}")
         patterns = [
             r"password\s*=\s*['\"][^'\"]+['\"]",
             r"api[_]?key\s*=\s*['\"][^'\"]+['\"]",
@@ -248,6 +279,7 @@ class SecurityAnalyzer(MetricProvider):
             r"token\s*=\s*['\"][^'\"]+['\"]"
         ]
 
+        issues_found = 0
         issues_found = 0
         for pattern in patterns:
             import re
@@ -258,6 +290,9 @@ class SecurityAnalyzer(MetricProvider):
                     continue
 
                 location = self._get_line_number(file_content, match.start())
+                # Don't log the actual secret, just the pattern found
+                pattern_found = match.group(0).split("=")[0].strip()
+                debug_log(f"Found potential hardcoded secret at line {location['line']}: {pattern_found}")
                 # Don't log the actual secret, just the pattern found
                 pattern_found = match.group(0).split("=")[0].strip()
                 debug_log(f"Found potential hardcoded secret at line {location['line']}: {pattern_found}")
@@ -318,6 +353,7 @@ class SecurityAnalyzer(MetricProvider):
             file_metrics.security.security_score -= 1
 
         file_metrics.security.security_score = max(0.0, file_metrics.security.security_score)
+        debug_log(f"Updated security score: {file_metrics.security.security_score}")
         debug_log(f"Updated security score: {file_metrics.security.security_score}")
 
     @staticmethod
