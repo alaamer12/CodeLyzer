@@ -38,7 +38,7 @@ def generate_reports(metrics, output_format: str, output_dir: str, project_path:
     """Generate reports based on the specified format."""
     logger.info(f"Generating reports in format: {output_format}")
     debug_log(f"Output directory: {output_dir}")
-    
+
     if output_format in ["html", "all"]:
         output_path = Path(output_dir)
         output_path.mkdir(exist_ok=True)
@@ -152,9 +152,9 @@ def compare(
     if debug_mode:
         set_log_level(logging.DEBUG)
         logger.debug("Debug mode enabled for comparison")
-    
+
     logger.info(f"Starting comparison between {path1} and {path2}")
-    
+
     console.print(Panel.fit(
         "⚖️ [bold blue]Codebase Comparison[/bold blue]",
         border_style="blue"
@@ -209,7 +209,7 @@ def compare(
             f"{val2:,.1f}" if isinstance(val2, float) else f"{val2:,}",
             diff_str
         )
-        
+
         logger.debug(f"Comparison - {label}: {val1} vs {val2}, diff: {diff}")
 
     console.print(comparison_table)
@@ -222,7 +222,7 @@ def languages():
     🌐 Show supported programming languages
     """
     logger.info("Displaying supported languages information")
-    
+
     console.print(Panel.fit(
         "🌐 [bold blue]Supported Programming Languages[/bold blue]",
         border_style="blue"
@@ -244,7 +244,6 @@ def languages():
 
 def main():
     # Import logging here to avoid circular imports
-    import logging
     # Just call app() to fix pyproject.toml script section
     app()
 

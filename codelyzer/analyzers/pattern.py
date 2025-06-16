@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Union, Optional
+from typing import Any, Dict, List
 
 from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider
 

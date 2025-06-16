@@ -3,7 +3,7 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, TypeVar, Literal, Optional
+from typing import Dict, Any, TypeVar, Literal
 
 from codelyzer.metrics import ProjectMetrics, SecurityLevel
 
@@ -12,9 +12,10 @@ T = TypeVar('T', bound='ChartData')
 # Theme constants
 ThemeType = Literal["light", "dark"]
 
+
 class ThemeColors:
     """Theme color constants for report styling"""
-    
+
     # Light theme colors
     LIGHT = {
         # Base colors
@@ -24,14 +25,14 @@ class ThemeColors:
         "text_secondary": "#4b5563",
         "border": "#e5e7eb",
         "border_secondary": "#d1d5db",
-        
+
         # Brand colors
         "brand_primary": "#3b82f6",
         "brand_primary_dark": "#2563eb",
         "brand_secondary": "#60a5fa",
         "brand_gradient_from": "#3b82f6",
         "brand_gradient_to": "#2563eb",
-        
+
         # Status colors
         "success": "#22c55e",
         "success_light": "#dcfce7",
@@ -45,29 +46,29 @@ class ThemeColors:
         "info": "#06b6d4",
         "info_light": "#cffafe",
         "info_dark": "#0891b2",
-        
+
         # UI Element colors
         "card_shadow": "rgba(0, 0, 0, 0.1)",
         "header_pattern": "rgba(255, 255, 255, 0.1)",
         "header_gradient_overlay": "rgba(255, 255, 255, 0.1)",
-        
+
         # Selection colors
         "selection_bg": "#3b82f620",
         "selection_text": "#2563eb",
-        
+
         # Chart colors
         "chart_colors": [
             "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
             "#06b6d4", "#f97316", "#84cc16", "#ec4899", "#6366f1"
         ],
-        
+
         # Component specific colors
         "complexity_low": "bg-green-100 text-green-800",
         "complexity_medium": "bg-yellow-100 text-yellow-800",
         "complexity_high": "bg-orange-100 text-orange-800",
         "complexity_very_high": "bg-red-100 text-red-800",
     }
-    
+
     # Dark theme colors
     DARK = {
         # Base colors
@@ -77,14 +78,14 @@ class ThemeColors:
         "text_secondary": "#d1d5db",
         "border": "#374151",
         "border_secondary": "#4b5563",
-        
+
         # Brand colors
         "brand_primary": "#3b82f6",
         "brand_primary_dark": "#2563eb",
         "brand_secondary": "#60a5fa",
         "brand_gradient_from": "#3b82f6",
         "brand_gradient_to": "#2563eb",
-        
+
         # Status colors
         "success": "#22c55e",
         "success_light": "#064e3b",
@@ -98,28 +99,29 @@ class ThemeColors:
         "info": "#06b6d4",
         "info_light": "#083344",
         "info_dark": "#0891b2",
-        
+
         # UI Element colors
         "card_shadow": "rgba(0, 0, 0, 0.25)",
         "header_pattern": "rgba(0, 0, 0, 0.2)",
         "header_gradient_overlay": "rgba(0, 0, 0, 0.3)",
-        
+
         # Selection colors
         "selection_bg": "#3b82f630",
         "selection_text": "#60a5fa",
-        
+
         # Chart colors - same as light theme for consistency
         "chart_colors": [
             "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
             "#06b6d4", "#f97316", "#84cc16", "#ec4899", "#6366f1"
         ],
-        
+
         # Component specific colors
         "complexity_low": "bg-green-900 text-green-100",
         "complexity_medium": "bg-yellow-900 text-yellow-100",
         "complexity_high": "bg-orange-900 text-orange-100",
         "complexity_very_high": "bg-red-900 text-red-100",
     }
+
 
 # Function to copy favicon to output directory
 def copy_favicon_to_output(output_dir: str) -> str:
@@ -135,18 +137,19 @@ def copy_favicon_to_output(output_dir: str) -> str:
     # Create assets/static directory in the output directory
     assets_dir = Path(output_dir) / "assets" / "static"
     assets_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Path to the favicon in the assets directory
     src_favicon_path = Path(__file__).parent.parent / "assets" / "favicon.png"
-    
+
     # Path to the destination favicon
     dest_favicon_path = assets_dir / "favicon.png"
-    
+
     # Copy the favicon file
     shutil.copy2(src_favicon_path, dest_favicon_path)
-    
+
     # Return the relative path to be used in HTML
     return "assets/static/favicon.png"
+
 
 class ReportComponent:
     """Base class for HTML report components"""
@@ -350,14 +353,14 @@ class ComplexFilesTableComponent(TableComponent):
 
         # Create a mapping of file paths to file metrics for quick lookup
         file_metrics_map = {fm.file_path: fm for fm in metrics.file_metrics}
-        
+
         # Ensure we have the most complex files
         # If most_complex_files is empty or doesn't have enough entries, recreate it based on complexity score
         if len(metrics.most_complex_files) < 15:
             # Sort files by complexity score in descending order
             sorted_files = sorted(metrics.file_metrics, key=lambda f: f.complexity_score, reverse=True)
             most_complex = [f.file_path for f in sorted_files[:15]]
-            
+
             # Use these sorted files for display
             display_files = most_complex
         else:
@@ -380,11 +383,13 @@ class ComplexFilesTableComponent(TableComponent):
 
             # Get complexity badge class based on score
             if file_metrics.complexity_score >= 30:
-                complexity_badge = ThemeColors.LIGHT["complexity_very_high"] + " dark:" + ThemeColors.DARK["complexity_very_high"]
+                complexity_badge = ThemeColors.LIGHT["complexity_very_high"] + " dark:" + ThemeColors.DARK[
+                    "complexity_very_high"]
             elif file_metrics.complexity_score >= 20:
                 complexity_badge = ThemeColors.LIGHT["complexity_high"] + " dark:" + ThemeColors.DARK["complexity_high"]
             elif file_metrics.complexity_score >= 10:
-                complexity_badge = ThemeColors.LIGHT["complexity_medium"] + " dark:" + ThemeColors.DARK["complexity_medium"]
+                complexity_badge = ThemeColors.LIGHT["complexity_medium"] + " dark:" + ThemeColors.DARK[
+                    "complexity_medium"]
             else:
                 complexity_badge = ThemeColors.LIGHT["complexity_low"] + " dark:" + ThemeColors.DARK["complexity_low"]
 
@@ -629,10 +634,11 @@ class PlotReportGenerator:
             'code_smells': '<i class="fas fa-bug text-purple-500 animate-icon-pulse" aria-hidden="true"></i>'
         }
 
-        icon = icon_map.get(chart_id, '<i class="fas fa-chart-pie text-blue-500 animate-icon-pulse" aria-hidden="true"></i>')
-        
+        icon = icon_map.get(chart_id,
+                            '<i class="fas fa-chart-pie text-blue-500 animate-icon-pulse" aria-hidden="true"></i>')
+
         hover_effect_class = "card-3d-effect"
-        
+
         # Add specific hover effects for different chart types
         hover_effects = {
             'languages': '''
@@ -656,7 +662,7 @@ class PlotReportGenerator:
                 <div class="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-purple-600 via-purple-400 to-purple-600 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1200 ease-in-out"></div>
             '''
         }
-        
+
         hover_effect = hover_effects.get(chart_id, '''
             <div class="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-blue-500 to-blue-300 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 ease-out"></div>
         ''')
@@ -848,7 +854,7 @@ class FooterComponent(ReportComponent):
 
 class ThemeToggleComponent(ReportComponent):
     """Theme toggle button component for HTML report"""
-    
+
     @staticmethod
     def render(metrics: 'ProjectMetrics') -> str:
         """Render the theme toggle button HTML section"""
@@ -1096,10 +1102,10 @@ class HTMLReportGenerator:
         """
         self._no_about = no_about
         self._prepare_data(metrics)
-        
+
         # Copy favicon to output directory
         favicon_path = copy_favicon_to_output(output_dir)
-        
+
         return self._build_html_template(metrics, favicon_path)
 
     def _prepare_data(self, metrics: 'ProjectMetrics') -> None:

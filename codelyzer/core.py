@@ -183,7 +183,7 @@ class AdvancedCodeAnalyzer:
 
     @debug
     def _get_file_metrics_and_content(self, file_path: str, language: str, file_size: int) -> Tuple[
-                                    Optional[FileMetrics], Optional[str]]:
+        Optional[FileMetrics], Optional[str]]:
         """Get metrics and content for a file using appropriate analyzer"""
         analyzer = self.language_analyzers.get(language)
         content = None

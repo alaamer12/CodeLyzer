@@ -1,7 +1,6 @@
 from typing import Any, Dict
 
 from codelyzer.console import logger, debug, debug_log
-from codelyzer.console import logger, debug, debug_log
 from codelyzer.metrics import FileMetrics, ProjectMetrics, MetricProvider, SecurityLevel
 
 

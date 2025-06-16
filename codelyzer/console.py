@@ -7,13 +7,11 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Dict, Callable, TypeVar, cast
-from typing import Any, List, Dict, Callable, TypeVar, cast
 
 from rich import box
 from rich.box import Box
 from rich.console import Console
 from rich.layout import Layout
-from rich.logging import RichHandler
 from rich.logging import RichHandler
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -254,6 +252,7 @@ def create_table_columns(table: Table, columns: Dict[str, Dict[str, Any]]) -> Ta
         table.add_column(column_name, **column_config)
     return table
 
+
 def _get_file_relative_path(file_path: str) -> str:
     """Get a readable relative path for display.
 
@@ -278,6 +277,7 @@ def _get_file_relative_path(file_path: str) -> str:
     debug_log(f"Resolved file path '{file_path}' to relative path '{relative_path}'")
     return relative_path
 
+
 def _get_issue_style(issue_count: int) -> str:
     """Determine the style color based on issue count.
 
@@ -294,6 +294,7 @@ def _get_issue_style(issue_count: int) -> str:
     else:
         return "red"
 
+
 def _get_issue_display(issue_count: int, style: str) -> str:
     """Format the issue display with appropriate styling.
 
@@ -306,6 +307,7 @@ def _get_issue_display(issue_count: int, style: str) -> str:
     """
     display_text = "✅" if issue_count == 0 else str(issue_count)
     return f"[{style}]{display_text}[/{style}]"
+
 
 def _create_hotspots_table_columns() -> Dict[str, Dict[str, Any]]:
     """Define the columns for the hotspots table.
@@ -320,6 +322,7 @@ def _create_hotspots_table_columns() -> Dict[str, Dict[str, Any]]:
         "issues": {"justify": "right", "style": "yellow"}
     }
 
+
 def _build_file_metrics_map(metrics: ProjectMetrics) -> Dict[str, Any]:
     """Create a mapping of file paths to their metrics for quick lookup.
 
@@ -329,9 +332,6 @@ def _build_file_metrics_map(metrics: ProjectMetrics) -> Dict[str, Any]:
     Returns:
         Dictionary mapping file paths to FileMetrics objects
     """
-    file_map = {fm.file_path: fm for fm in metrics.file_metrics}
-    debug_log(f"Built file metrics map with {len(file_map)} entries")
-    return file_map
     file_map = {fm.file_path: fm for fm in metrics.file_metrics}
     debug_log(f"Built file metrics map with {len(file_map)} entries")
     return file_map
@@ -455,7 +455,7 @@ def create_and_display_layout(metrics: ProjectMetrics) -> None:
     )
 
     console.print(layout)
-    
+
     return None
 
 
@@ -478,7 +478,7 @@ def display_initial_info(project_path: Path, exclude: List[str], include_tests: 
 
     if include_tests:
         console.print("[yellow]🧪 Including test directories[/yellow]")
-    
+
     return None
 
 
@@ -505,7 +505,7 @@ def display_final_summary(metrics: ProjectMetrics) -> None:
 📝 Log file: {LOG_FILENAME}
 📝 Log file: {LOG_FILENAME}
 """)
-    
+
     return None
 
 
@@ -533,7 +533,7 @@ def display_verbose_info(metrics: ProjectMetrics) -> None:
     console.print()
 
     display_security_issues(metrics)
-    
+
     return None
 
 
@@ -564,5 +564,5 @@ def display_security_issues(metrics: ProjectMetrics) -> None:
 
         console.print(security_table)
         console.print()
-    
+
     return None

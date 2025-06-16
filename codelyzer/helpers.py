@@ -134,7 +134,7 @@ class ProjectMetricsProcessor:
 
         # Quality scores
         Scoring.calculate_quality_scores(metrics)
-        
+
         return None
 
 
@@ -240,11 +240,11 @@ class Scoring:
         # If already calculated, return the existing value
         if project_metrics.code_quality.code_quality_score != 100.0:  # Default value is 100.0
             return project_metrics.code_quality.code_quality_score
-            
+
         # Calculate code quality score (based on code smells and security issues)
         total_issues = sum(len(file_metrics.security_issues) + len(file_metrics.code_smells_list)
-                        for file_metrics in project_metrics.file_metrics)
-                        
+                           for file_metrics in project_metrics.file_metrics)
+
         if project_metrics.total_sloc > 0:
             # Calculate an issue density score
             issue_density = total_issues / project_metrics.total_sloc
@@ -264,14 +264,14 @@ class Scoring:
         # If already calculated, return the existing value
         if project_metrics.complexity.maintainability_score != 0.0:  # Default value is 0.0
             return project_metrics.complexity.maintainability_score
-            
+
         # Calculate maintainability score
         valid_files = [f for f in project_metrics.file_metrics if
-                    hasattr(f.complexity, 'maintainability_index') and f.complexity.maintainability_index > 0]
+                       hasattr(f.complexity, 'maintainability_index') and f.complexity.maintainability_index > 0]
         if valid_files:
             avg_maintainability = sum(f.maintainability_index for f in valid_files) / len(valid_files)
             return max(0, min(100, int(avg_maintainability)))
-        
+
         return 0.0
 
     @staticmethod

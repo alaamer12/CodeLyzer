@@ -123,22 +123,22 @@ class ComplexityAnalyzer(MetricProvider):
             return 0
 
         lines = content.split('\n')
-        
+
         if language == "python":
             return self._calculate_python_cognitive_complexity(lines)
         elif language in ["javascript", "typescript", "jsx"]:
             return self._calculate_js_cognitive_complexity(lines)
         else:
             return 0  # Default for unsupported languages
-            
+
     def _calculate_python_cognitive_complexity(self, lines: list[str]) -> int:
         """Calculate cognitive complexity for Python code"""
         complexity = 0
         nesting_level = 0
-        
+
         for line in lines:
             stripped = line.strip()
-            
+
             if self._is_python_nesting_structure(stripped):
                 complexity += nesting_level + 1  # Higher cost for deeper nesting
                 nesting_level += 1
@@ -147,7 +147,7 @@ class ComplexityAnalyzer(MetricProvider):
                 new_level = (len(line) - len(stripped)) // 4  # Assuming 4-space indentation
                 if new_level < nesting_level:
                     nesting_level = new_level
-                    
+
         return complexity
 
     @staticmethod
@@ -160,24 +160,24 @@ class ComplexityAnalyzer(MetricProvider):
     def _is_python_dedent(line: str, stripped_line: str, current_nesting: int) -> bool:
         """Check if the line represents a dedent in Python"""
         return stripped_line and len(line) - len(stripped_line) < current_nesting * 4
-    
+
     @staticmethod
     def _calculate_js_cognitive_complexity(lines: list[str]) -> int:
         """Calculate cognitive complexity for JavaScript/TypeScript code"""
         complexity = 0
         nesting_level = 0
-        
+
         for line in lines:
             stripped = line.strip()
-            
+
             if '{' in stripped:
                 complexity += nesting_level + 1
                 nesting_level += stripped.count('{')
-                
+
             if '}' in stripped:
                 nesting_level -= stripped.count('}')
                 nesting_level = max(0, nesting_level)  # Ensure no negative nesting
-                
+
         return complexity
 
     def _calculate_maintainability_index(self, file_metrics: FileMetrics, content: str) -> float:

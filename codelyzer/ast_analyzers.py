@@ -1,7 +1,8 @@
-import os
 import concurrent.futures
+import os
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Dict, List, Optional, Type
+
 from tree_sitter import Language, Parser
 
 from codelyzer.config import PARSE_TIMEOUT, FILE_SIZE_LIMIT
@@ -13,6 +14,7 @@ try:
     import tree_sitter_python
     import tree_sitter_javascript
     import tree_sitter_typescript
+
     TREE_SITTER_AVAILABLE = True
 except ImportError:
     tree_sitter_python = None
@@ -57,7 +59,7 @@ class ASTAnalyzer(ABC):
             # Check if the file is a TypeScript definition file (.d.ts) - these often need special handling
             if file_path.endswith('.d.ts'):
                 return self._analyze_definition_file(file_path)
-                
+
             # Check file size first to avoid hanging on massive files
             if self._is_file_too_large(file_path):
                 return self._create_metrics_for_large_file(file_path)
@@ -109,7 +111,7 @@ class ASTAnalyzer(ABC):
         """Create metrics for files that are too large to process normally"""
         metrics = self._create_metrics_for_file(file_path)
         file_size = os.path.getsize(file_path)
-        
+
         # Accurately count lines for large files without reading the whole file into memory
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -119,7 +121,7 @@ class ASTAnalyzer(ABC):
         except Exception:
             # Fallback to estimation if line counting fails
             metrics.base.loc = metrics.base.sloc = file_size // 100
-            
+
         metrics.base.file_size = file_size
         return metrics
 
@@ -221,48 +223,48 @@ class ASTAnalyzer(ABC):
         metrics = self._create_metrics_for_file(file_path)
         file_size = os.path.getsize(file_path)
         metrics.base.file_size = file_size
-        
+
         try:
             # Count total lines first to ensure accurate LOC reporting
             total_line_count = 0
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 total_line_count = sum(1 for _ in f)
-            
+
             # Special handling for very large definition files
             if total_line_count > 5000:  # Threshold for "large" definition files
                 # # Just log the correct count and update metrics
                 # console.print(f"[green]Processed TypeScript definition file {file_path} with {total_line_count} lines[/green]")
-                
+
                 # Use a conservative estimation for blank and comment lines
                 blank_lines = int(total_line_count * 0.1)  # Estimate 10% blank lines
                 comment_lines = int(total_line_count * 0.4)  # Estimate 40% comment lines
-                
+
                 # Update metrics with accurate counts
                 metrics.base.loc = total_line_count
                 metrics.base.blanks = blank_lines
                 metrics.base.comments = comment_lines
                 metrics.base.sloc = total_line_count - blank_lines - comment_lines
-                
+
                 # Add some complexity based on total size
                 interface_count = int(total_line_count / 100)
                 type_count = int(total_line_count / 150)
                 function_count = int(total_line_count / 200)
-                
+
                 # Structure metrics
                 metrics.structure.functions = function_count
-                
+
                 # Add TypeScript specific metrics
                 ts_metrics = FileMetricCategory()
                 ts_metrics.add_metric("interfaces", interface_count)
                 ts_metrics.add_metric("types", type_count)
                 metrics.add_custom_metric_category("typescript", ts_metrics)
-                
+
                 # Complexity metrics - use a formula that makes sense for definition files
                 metrics.complexity.cyclomatic_complexity = interface_count + type_count + function_count
                 metrics.complexity.complexity_score = float(interface_count * 2 + type_count + function_count)
-                
+
                 return metrics
-            
+
             # For regular-sized files, use the standard line-by-line approach
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 # Initialize counters
@@ -272,36 +274,36 @@ class ASTAnalyzer(ABC):
                 interface_count = 0
                 type_count = 0
                 function_count = 0
-                
+
                 # Simple state tracking
                 in_multiline_comment = False
-                
+
                 # Process the file line by line
                 for line in f:
                     stripped_line = line.strip()
-                    
+
                     # Track blank lines
                     if not stripped_line:
                         blank_lines += 1
                         continue
-                        
+
                     # Track comments
                     if in_multiline_comment:
                         comment_lines += 1
                         if '*/' in stripped_line:
                             in_multiline_comment = False
                         continue
-                        
+
                     if stripped_line.startswith('//'):
                         comment_lines += 1
                         continue
-                        
+
                     if stripped_line.startswith('/*'):
                         comment_lines += 1
                         if '*/' not in stripped_line:
                             in_multiline_comment = True
                         continue
-                    
+
                     # Count TypeScript constructs
                     if 'interface ' in stripped_line:
                         interface_count += 1
@@ -309,33 +311,33 @@ class ASTAnalyzer(ABC):
                         type_count += 1
                     elif 'function ' in stripped_line or 'method(' in stripped_line:
                         function_count += 1
-                
+
                 # Update metrics with accurate counts
                 metrics.base.loc = loc
                 metrics.base.blanks = blank_lines
                 metrics.base.comments = comment_lines
                 metrics.base.sloc = loc - blank_lines - comment_lines
-                
+
                 # Structure metrics
                 metrics.structure.functions = function_count
-                
+
                 # Add TypeScript specific metrics
                 ts_metrics = FileMetricCategory()
                 ts_metrics.add_metric("interfaces", interface_count)
                 ts_metrics.add_metric("types", type_count)
                 metrics.add_custom_metric_category("typescript", ts_metrics)
-                
+
                 # Complexity metrics - use a formula that makes sense for definition files
                 metrics.complexity.cyclomatic_complexity = interface_count + type_count + function_count
                 metrics.complexity.complexity_score = float(interface_count * 2 + type_count + function_count)
-                
+
             # console.print(f"[green]Processed TypeScript definition file {file_path} with {loc} lines[/green]")
-            
+
         except Exception as e:
             console.print(f"[yellow]Warning: Error analyzing TypeScript definition file {file_path}: {str(e)}[/yellow]")
             # Fall back to basic estimation
             metrics.base.loc = metrics.base.sloc = file_size // 40  # More accurate estimate for .d.ts files
-            
+
         return metrics
 
 
@@ -367,7 +369,7 @@ class TreeSitterASTAnalyzer(ASTAnalyzer, ABC):
                 console.print(f"[red]Error: No language module specified for {cls.language_name}[/red]")
                 cls.language_parser = None
                 return
-                
+
             # Create Language object using the module's language function
             language = Language(cls.language_module.language())
             parser = Parser()
@@ -458,13 +460,13 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
 
         # Extract structure metrics (classes, functions, methods, imports)
         structure_metrics = self._extract_structure_metrics(root_node)
-        
+
         # Update structure metrics
         self._update_structure_metrics(metrics, structure_metrics)
-        
+
         # Calculate and update complexity metrics
         self._update_complexity_metrics(metrics, root_node)
-    
+
     def _extract_structure_metrics(self, root_node: Any) -> Dict[str, Any]:
         """Extract structural metrics from the AST"""
         class_count = 0
@@ -498,7 +500,7 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
             'methods': method_count,
             'imports': imports_list
         }
-    
+
     @staticmethod
     def _is_method(node: Any) -> bool:
         """Determine if a function definition is a method (inside a class)"""
@@ -508,7 +510,7 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
                 return True
             parent = parent.parent
         return False
-    
+
     @staticmethod
     def _update_structure_metrics(metrics: FileMetrics, structure_metrics: Dict[str, Any]) -> None:
         """Update the metrics object with structure metrics"""
@@ -516,7 +518,7 @@ class PythonASTAnalyzer(TreeSitterASTAnalyzer):
         metrics.structure.functions = structure_metrics['functions']
         metrics.structure.methods = structure_metrics['methods']
         metrics.structure.imports = structure_metrics['imports']
-    
+
     def _update_complexity_metrics(self, metrics: FileMetrics, root_node: Any) -> None:
         """Calculate and update complexity metrics"""
         complexity = self._calculate_cyclomatic_complexity(root_node)
@@ -754,7 +756,7 @@ class TypeScriptASTAnalyzer(TreeSitterASTAnalyzer):
         metrics.structure.classes = class_count
         metrics.structure.functions = function_count
         metrics.structure.imports = imports_list
-        
+
         # Add TypeScript specific metrics as custom metrics
         ts_metrics = FileMetricCategory()
         ts_metrics.add_metric("interfaces", interface_count)
@@ -843,20 +845,20 @@ class RustStubASTAnalyzer(ASTAnalyzer):
     """Stub analyzer for Rust files when tree-sitter-rust is incompatible"""
 
     extensions = ['.rs']
-    
+
     def __init__(self):
         """Initialize the Rust stub analyzer"""
         console.print("[yellow]Using stub analyzer for Rust due to compatibility issues[/yellow]")
         console.print("[yellow]This will provide basic metrics without AST analysis[/yellow]")
-    
+
     @classmethod
     def _get_language_name(cls) -> str:
         return "rust"
-    
+
     def _parse_with_timeout(self, content: str, file_path: str) -> Any:
         """Return None since we can't parse the AST"""
         return None
-    
+
     def _calculate_metrics(self, ast_data: Any, metrics: FileMetrics, content: str = None) -> None:
         """Calculate basic metrics without AST analysis"""
         # We can still calculate some basic metrics from the content
@@ -864,30 +866,30 @@ class RustStubASTAnalyzer(ASTAnalyzer):
             # Count functions by looking for 'fn' keyword
             fn_count = content.count("\nfn ")
             metrics.structure.functions = fn_count
-            
+
             # Count structs by looking for 'struct' keyword
             struct_count = content.count("\nstruct ")
-            
+
             # Count impls by looking for 'impl' keyword
             impl_count = content.count("\nimpl ")
-            
+
             # Count traits by looking for 'trait' keyword
             trait_count = content.count("\ntrait ")
-            
+
             # Use structs + traits as a rough estimate for "classes"
             metrics.structure.classes = struct_count + trait_count
-            
+
             # Count imports by looking for 'use' statements
             import_count = content.count("\nuse ")
-            metrics.structure.imports = [f"use_statement_{i+1}" for i in range(import_count)]
-            
+            metrics.structure.imports = [f"use_statement_{i + 1}" for i in range(import_count)]
+
             # Add Rust specific metrics
             rust_metrics = FileMetricCategory()
             rust_metrics.add_metric("structs", struct_count)
             rust_metrics.add_metric("traits", trait_count)
             rust_metrics.add_metric("impls", impl_count)
             metrics.add_custom_metric_category("rust", rust_metrics)
-            
+
             # Very rough complexity estimate based on control flow keywords
             complexity = 1
             complexity += content.count("if ")
@@ -898,20 +900,20 @@ class RustStubASTAnalyzer(ASTAnalyzer):
             complexity += content.count("loop ")
             metrics.complexity.cyclomatic_complexity = complexity
             metrics.complexity.complexity_score = float(complexity)
-    
+
     def _count_comment_lines(self, content: str, file_path: str) -> int:
         """Count comment lines by simple text analysis"""
         if not content:
             return 0
-        
+
         lines = content.split('\n')
         comment_count = 0
-        
+
         for line in lines:
             line = line.strip()
             if line.startswith('//') or line.startswith('/*') or line.endswith('*/'):
                 comment_count += 1
-        
+
         return comment_count
 
 
@@ -920,51 +922,54 @@ def initialize_analyzers():
     """Initialize all tree-sitter analyzers"""
     if not TREE_SITTER_AVAILABLE:
         console.print("[yellow]Warning: tree-sitter or language modules not available.[/yellow]")
-        console.print("[yellow]Install them with: pip install tree-sitter tree-sitter-python tree-sitter-javascript[/yellow]")
-        console.print("[yellow]For TypeScript and Rust, consider using tree-sitter-languages for better compatibility:[/yellow]")
+        console.print(
+            "[yellow]Install them with: pip install tree-sitter tree-sitter-python tree-sitter-javascript[/yellow]")
+        console.print(
+            "[yellow]For TypeScript and Rust, consider using tree-sitter-languages for better compatibility:[/yellow]")
         console.print("[yellow]pip install tree-sitter-languages[/yellow]")
         return
-    
+
     try:
         PythonASTAnalyzer.initialize_parser()
         console.print("[green]Initialized tree-sitter parser for Python[/green]")
     except Exception as e:
         console.print(f"[red]Failed to initialize Python parser: {str(e)}[/red]")
-    
+
     try:
         JavaScriptASTAnalyzer.initialize_parser()
         console.print("[green]Initialized tree-sitter parser for JavaScript[/green]")
     except Exception as e:
         console.print(f"[red]Failed to initialize JavaScript parser: {str(e)}[/red]")
-    
+
     # TypeScript parser is initialized when needed
     console.print("[blue]TypeScript parser will be initialized when needed[/blue]")
-    
+
     # Use RustStubASTAnalyzer instead of trying to initialize RustASTAnalyzer
     # Register the stub analyzer for .rs files
     ASTAnalyzer.ANALYZERS['.rs'] = RustStubASTAnalyzer
     console.print("[yellow]Using stub analyzer for Rust due to compatibility issues[/yellow]")
-    console.print("[yellow]For better Rust support, fix the version compatibility between tree-sitter and tree-sitter-rust[/yellow]")
+    console.print(
+        "[yellow]For better Rust support, fix the version compatibility between tree-sitter and tree-sitter-rust[/yellow]")
 
 
 def test_rust_parser():
     """Test function to diagnose Rust parser initialization issues"""
     console.print("[bold]Testing Rust parser initialization...[/bold]")
-    
+
     try:
         import tree_sitter
         console.print(f"tree-sitter version: {tree_sitter.__version__}")
     except Exception as e:
         console.print(f"Error importing tree_sitter: {e}")
-    
+
     try:
         import tree_sitter_rust
         console.print("tree_sitter_rust imported successfully")
-        
+
         # Try to access language attribute
         if hasattr(tree_sitter_rust, 'language'):
             console.print("tree_sitter_rust.language exists")
-            
+
             # Check if it's callable
             if callable(tree_sitter_rust.language):
                 console.print("tree_sitter_rust.language is callable")
@@ -978,7 +983,7 @@ def test_rust_parser():
                 console.print(f"Type of tree_sitter_rust.language: {type(tree_sitter_rust.language)}")
         else:
             console.print("tree_sitter_rust.language does not exist")
-            
+
         # List all attributes
         console.print("All attributes of tree_sitter_rust:")
         for attr in dir(tree_sitter_rust):
@@ -986,7 +991,7 @@ def test_rust_parser():
                 console.print(f"- {attr}: {type(getattr(tree_sitter_rust, attr))}")
     except Exception as e:
         console.print(f"Error with tree_sitter_rust: {e}")
-    
+
     try:
         from tree_sitter_languages import get_parser
         console.print("tree_sitter_languages.get_parser is available")
@@ -998,19 +1003,19 @@ def test_rust_parser():
             console.print(f"Error creating Rust parser with tree_sitter_languages: {e}")
     except Exception as e:
         console.print(f"Error with tree_sitter_languages: {e}")
-        
+
     # Try direct parser creation without Language constructor
     try:
         parser = tree_sitter.Parser()
         console.print("Created tree_sitter.Parser successfully")
-        
+
         try:
             # Try direct assignment
             parser.language = tree_sitter_rust.language
             console.print("Direct assignment of tree_sitter_rust.language succeeded")
         except Exception as e:
             console.print(f"Direct assignment failed: {e}")
-            
+
             try:
                 # Try calling it first
                 lang_obj = tree_sitter_rust.language()
@@ -1023,7 +1028,6 @@ def test_rust_parser():
 
 
 if __name__ == "__main__":
-    
     tests_path = r"E:\Projects\Languages\Python\WorkingOnIt\CodeLyzer\test_examples"
 
     # Test JavaScript analyzer
