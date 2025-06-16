@@ -891,6 +891,180 @@ class ThemeToggleComponent(ReportComponent):
         </div>'''
 
 
+class NavbarComponent(ReportComponent):
+    """Navbar component for page switching"""
+
+    @staticmethod
+    def render(metrics: 'ProjectMetrics') -> str:
+        """Render the navbar HTML section"""
+        return '''
+        <div class="mb-8 border-b border-gray-200 dark:border-gray-700 fade-in" style="animation-delay: 0.2s;">
+            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                <a href="#" id="tab-dashboard" class="tab-item active group inline-flex items-center gap-2 whitespace-nowrap py-4 px-1 border-b-2 font-semibold text-sm transition-all duration-300">
+                    <i class="fas fa-chart-pie"></i>
+                    Dashboard
+                </a>
+                <a href="#" id="tab-about" class="tab-item group inline-flex items-center gap-2 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300">
+                    <i class="fas fa-info-circle"></i>
+                    How It Works
+                </a>
+            </nav>
+        </div>
+        '''
+
+
+class AboutPageComponent(ReportComponent):
+    """About page component for HTML report"""
+
+    @staticmethod
+    def render(metrics: 'ProjectMetrics') -> str:
+        """Render the about page HTML section"""
+        return '''
+        <div class="max-w-none p-2 sm:p-4 md:p-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-body mb-2 flex items-center justify-center gap-3">
+                    <i class="fas fa-cogs text-blue-500"></i>How CodeLyzer Works
+                </h2>
+                <p class="text-lg text-muted max-w-3xl mx-auto">
+                    CodeLyzer performs a comprehensive static analysis of your codebase. Here's a breakdown of the process and the metrics we calculate.
+                </p>
+            </div>
+
+            <!-- Analysis Pipeline Section -->
+            <div class="mb-16">
+                <h3 class="text-2xl font-semibold text-center mb-8 text-body">Core Analysis Pipeline</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+                    <!-- Step 1: Discovery -->
+                    <div class="about-card">
+                        <div class="about-card-icon bg-blue-100 text-blue-600"><i class="fas fa-search"></i></div>
+                        <h4 class="font-semibold text-lg mb-2">1. Discovery</h4>
+                        <p class="text-sm text-muted">Scans the project directory, respecting <code>.gitignore</code> and user exclusions to build a file list.</p>
+                    </div>
+                    <!-- Step 2: Language Detection -->
+                    <div class="about-card">
+                        <div class="about-card-icon bg-green-100 text-green-600"><i class="fas fa-file-code"></i></div>
+                        <h4 class="font-semibold text-lg mb-2">2. Language Detection</h4>
+                        <p class="text-sm text-muted">Identifies each file's language via its extension to route it to the correct analyzer.</p>
+                    </div>
+                    <!-- Step 3: Analysis -->
+                    <div class="about-card">
+                        <div class="about-card-icon bg-purple-100 text-purple-600"><i class="fas fa-drafting-compass"></i></div>
+                        <h4 class="font-semibold text-lg mb-2">3. Analysis</h4>
+                        <p class="text-sm text-muted">Uses AST parsing (Python) or pattern matching (other languages) to extract key insights.</p>
+                    </div>
+                    <!-- Step 4: Aggregation -->
+                    <div class="about-card">
+                        <div class="about-card-icon bg-yellow-100 text-yellow-600"><i class="fas fa-calculator"></i></div>
+                        <h4 class="font-semibold text-lg mb-2">4. Aggregation</h4>
+                        <p class="text-sm text-muted">Collects and summarizes data from all files into the final project-wide metrics.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics Deep Dive Section -->
+            <div>
+                <h3 class="text-2xl font-semibold text-center mb-8 text-body">Metrics Deep Dive</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- Cyclomatic Complexity -->
+                    <details class="metric-card group">
+                        <summary class="metric-card-summary">
+                            <i class="fas fa-project-diagram metric-card-icon text-indigo-500"></i>
+                            <span>Cyclomatic Complexity</span>
+                            <i class="fas fa-chevron-down transform transition-transform duration-300 group-open:rotate-180"></i>
+                        </summary>
+                        <div class="metric-card-content">
+                            <p>Measures the number of independent paths in the code. Lower scores mean simpler, more testable code.</p>
+                            <table class="w-full text-sm mt-4">
+                                <thead><tr><th class="px-2 py-1">Score</th><th class="px-2 py-1">Risk</th></tr></thead>
+                                <tbody>
+                                    <tr><td>1-10</td><td>Low Risk / Simple</td></tr>
+                                    <tr><td>11-20</td><td>Medium Risk / Complex</td></tr>
+                                    <tr><td>21-30</td><td>High Risk / Very Complex</td></tr>
+                                    <tr><td>30+</td><td>Critical Risk / Untestable</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+
+                    <!-- Security Analysis -->
+                    <details class="metric-card group">
+                        <summary class="metric-card-summary">
+                            <i class="fas fa-shield-alt metric-card-icon text-red-500"></i>
+                            <span>Security Analysis</span>
+                            <i class="fas fa-chevron-down transform transition-transform duration-300 group-open:rotate-180"></i>
+                        </summary>
+                        <div class="metric-card-content">
+                            <p>Scans for vulnerabilities using <strong>Bandit</strong> for Python and regex for other languages.</p>
+                            <p class="mt-2">Example regex pattern:</p>
+                            <pre><code>(api_key|secret|password)\\s*[:=]</code></pre>
+                            <p class="mt-2">Issues are ranked by severity to prioritize critical fixes.</p>
+                        </div>
+                    </details>
+
+                    <!-- Code Smells -->
+                    <details class="metric-card group">
+                        <summary class="metric-card-summary">
+                            <i class="fas fa-bug metric-card-icon text-orange-500"></i>
+                            <span>Code Smells</span>
+                            <i class="fas fa-chevron-down transform transition-transform duration-300 group-open:rotate-180"></i>
+                        </summary>
+                        <div class="metric-card-content">
+                            <p>Flags patterns that suggest deeper problems, such as:</p>
+                            <ul class="list-disc list-inside mt-2">
+                                <li><strong>Long Function:</strong> &gt; 40 lines</li>
+                                <li><strong>Large Class:</strong> &gt; 200 lines</li>
+                                <li><strong>Magic Numbers:</strong> Unnamed numerical constants</li>
+                            </ul>
+                        </div>
+                    </details>
+                    
+                    <!-- Dependency Analysis -->
+                    <details class="metric-card group">
+                        <summary class="metric-card-summary">
+                            <i class="fas fa-cubes metric-card-icon text-teal-500"></i>
+                            <span>Dependency Analysis</span>
+                            <i class="fas fa-chevron-down transform transition-transform duration-300 group-open:rotate-180"></i>
+                        </summary>
+                        <div class="metric-card-content">
+                            <p>Detects imported modules and libraries to map project dependencies. This helps visualize coupling and identify potentially unused imports.</p>
+                        </div>
+                    </details>
+                    
+                    <!-- Code Quality Score -->
+                    <details class="metric-card group">
+                        <summary class="metric-card-summary">
+                            <i class="fas fa-star metric-card-icon text-yellow-500"></i>
+                            <span>Code Quality Score</span>
+                            <i class="fas fa-chevron-down transform transition-transform duration-300 group-open:rotate-180"></i>
+                        </summary>
+                        <div class="metric-card-content">
+                            <p>A weighted score reflecting overall codebase health. A higher score is better.</p>
+                            <pre><code>Score = 100 - (w_c * C + w_s * S + w_sec * Sec)</code></pre>
+                            <p class="mt-2">Weights are calibrated to heavily penalize security risks and high complexity.</p>
+                        </div>
+                    </details>
+
+                    <!-- Maintainability Score -->
+                    <details class="metric-card group">
+                        <summary class="metric-card-summary">
+                            <i class="fas fa-tools metric-card-icon text-cyan-500"></i>
+                            <span>Maintainability Score</span>
+                            <i class="fas fa-chevron-down transform transition-transform duration-300 group-open:rotate-180"></i>
+                        </summary>
+                        <div class="metric-card-content">
+                            <p>Estimates how easily code can be modified, based on an adapted Maintainability Index formula.</p>
+                             <pre><code>MI ≈ f(Avg Complexity, SLOC, Comments)</code></pre>
+                             <p class="mt-2">A score from 0-100, where higher is better. Scores below 60 may indicate technical debt.</p>
+                        </div>
+                    </details>
+
+                </div>
+            </div>
+        </div>
+        '''
+
+
 def format_timestamp() -> str:
     """Format the current timestamp for display.
 
@@ -907,17 +1081,20 @@ class HTMLReportGenerator:
         """Initialize the HTML report generator."""
         self._plot_generator = PlotReportGenerator()
         self._default_theme = "light"
+        self._no_about = False
 
-    def create(self, metrics: 'ProjectMetrics', output_dir: str = "reports") -> str:
+    def create(self, metrics: 'ProjectMetrics', output_dir: str = "reports", no_about: bool = False) -> str:
         """Generate HTML report for the given metrics.
         
         Args:
             metrics: ProjectMetrics object containing analysis data
             output_dir: Directory to save the report and assets (default: reports)
+            no_about: If True, the about page will not be included
             
         Returns:
             Complete HTML report as a string
         """
+        self._no_about = no_about
         self._prepare_data(metrics)
         
         # Copy favicon to output directory
@@ -957,6 +1134,7 @@ class HTMLReportGenerator:
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/typography@0.5.x/dist/typography.min.js"></script>
     <style>
         :root {{
             color-scheme: light dark;
@@ -1156,6 +1334,121 @@ class HTMLReportGenerator:
         .animate-pulse-subtle {{
             animation: pulse-subtle 3s ease-in-out infinite;
         }}
+        
+        .tab-item {{
+            color: var(--text-secondary);
+            border-color: transparent;
+        }}
+        .tab-item:hover {{
+            color: var(--text-primary);
+            border-color: var(--border-secondary);
+        }}
+        .tab-item.active {{
+            color: var(--brand-primary);
+            border-color: var(--brand-primary);
+        }}
+        .prose {{
+            --tw-prose-body: var(--text-primary);
+            --tw-prose-headings: var(--text-primary);
+            --tw-prose-lead: var(--text-secondary);
+            --tw-prose-links: var(--brand-primary);
+            --tw-prose-bold: var(--text-primary);
+            --tw-prose-counters: var(--text-secondary);
+            --tw-prose-bullets: var(--border-secondary);
+            --tw-prose-hr: var(--border-color);
+            --tw-prose-quotes: var(--text-primary);
+            --tw-prose-quote-borders: var(--border-color);
+            --tw-prose-captions: var(--text-secondary);
+            --tw-prose-code: var(--brand-primary);
+            --tw-prose-pre-code: var(--text-secondary);
+            --tw-prose-pre-bg: var(--bg-primary);
+            --tw-prose-th-borders: var(--border-secondary);
+            --tw-prose-td-borders: var(--border-color);
+        }}
+
+        /* New styles for About Page */
+        .about-card {{
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }}
+        .about-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            border-color: var(--brand-primary);
+        }}
+        .about-card-icon {{
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }}
+
+        .metric-card {{
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }}
+        .metric-card-summary {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+        }}
+        .metric-card-summary > span {{
+            flex-grow: 1;
+        }}
+        .metric-card-summary:hover {{
+            background-color: rgba(128, 128, 128, 0.05);
+        }}
+        .metric-card-icon {{
+            font-size: 1.25rem;
+        }}
+        .metric-card-content {{
+            padding: 0 1.5rem 1.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }}
+        .metric-card-content p, .metric-card-content ul {{
+            margin-bottom: 0.5rem;
+        }}
+        .metric-card-content pre {{
+            background-color: var(--bg-primary);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            border: 1px solid var(--border-color);
+            white-space: pre-wrap;
+        }}
+        .metric-card-content table {{
+            text-align: left;
+            margin-top: 1rem;
+            border-collapse: collapse;
+        }}
+        .metric-card-content th, .metric-card-content td {{
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }}
+         .metric-card-content tr:last-child td {{
+            border-bottom: none;
+        }}
+        .metric-card-content th {{
+            background-color: rgba(128, 128, 128, 0.05);
+            font-weight: 600;
+        }}
     </style>
     <script>
         tailwind.config = {{
@@ -1177,13 +1470,20 @@ class HTMLReportGenerator:
     {ThemeToggleComponent.render(metrics)}
     <div class="max-w-7xl mx-auto p-6">
         {HeaderComponent.render(metrics)}
-        {MetricsGridComponent.render(metrics)}
-        {self._plot_generator.get_charts_grid_html()}
         
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 fade-in">
-            {ComplexFilesTableComponent.render(metrics)}
-            {DependenciesTableComponent.render(metrics)}
+        {'' if self._no_about else NavbarComponent.render(metrics)}
+
+        <div id="page-dashboard">
+            {MetricsGridComponent.render(metrics)}
+            {self._plot_generator.get_charts_grid_html()}
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 fade-in">
+                {ComplexFilesTableComponent.render(metrics)}
+                {DependenciesTableComponent.render(metrics)}
+            </div>
         </div>
+        
+        {'' if self._no_about else f'<div id="page-about" class="hidden">{AboutPageComponent.render(metrics)}</div>'}
         
         {FooterComponent.render(metrics)}
     </div>
@@ -1429,7 +1729,52 @@ class HTMLReportGenerator:
 
         // Set up table sorting functionality
         setupTableSorting();
+        
+        // Set up tab navigation if not disabled
+        const aboutPage = document.getElementById('page-about');
+        if (aboutPage) {{
+            setupTabNavigation();
+        }}
     }});
+    
+    // Tab navigation functionality
+    function setupTabNavigation() {{
+        const tabDashboard = document.getElementById('tab-dashboard');
+        const tabAbout = document.getElementById('tab-about');
+        const pageDashboard = document.getElementById('page-dashboard');
+        const pageAbout = document.getElementById('page-about');
+
+        const tabs = [tabDashboard, tabAbout];
+        const pages = [pageDashboard, pageAbout];
+
+        const setActiveTab = (targetTab) => {{
+            tabs.forEach(tab => {{
+                if (tab === targetTab) {{
+                    tab.classList.add('active');
+                }} else {{
+                    tab.classList.remove('active');
+                }}
+            }});
+
+            if (targetTab === tabDashboard) {{
+                pageDashboard.classList.remove('hidden');
+                pageAbout.classList.add('hidden');
+            }} else {{
+                pageDashboard.classList.add('hidden');
+                pageAbout.classList.remove('hidden');
+            }}
+        }};
+
+        tabDashboard.addEventListener('click', (e) => {{
+            e.preventDefault();
+            setActiveTab(tabDashboard);
+        }});
+
+        tabAbout.addEventListener('click', (e) => {{
+            e.preventDefault();
+            setActiveTab(tabAbout);
+        }});
+    }}
     
     // Table sorting functionality
     function setupTableSorting() {{
@@ -1569,7 +1914,7 @@ class HTMLReportGenerator:
 </script>'''
 
 
-def generate_direct_html(metrics: 'ProjectMetrics', output_dir: str = "reports") -> str:
+def generate_direct_html(metrics: 'ProjectMetrics', output_dir: str = "reports", no_about: bool = False) -> str:
     """Generate HTML directly without using format strings to avoid issues"""
     generator = HTMLReportGenerator()
-    return generator.create(metrics, output_dir)
+    return generator.create(metrics, output_dir, no_about=no_about)

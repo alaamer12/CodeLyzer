@@ -382,13 +382,26 @@ class ProjectMetrics:
     def most_complex_files(self) -> List[str]:
         return self.complexity.most_complex_files
 
+    @most_complex_files.setter
+    def most_complex_files(self, value: List[str]) -> None:
+        """Set the most complex files list"""
+        self.complexity.most_complex_files = value
+
     @property
     def code_quality_score(self) -> float:
         return self.code_quality.code_quality_score
 
+    @code_quality_score.setter
+    def code_quality_score(self, value: float) -> None:
+        self.code_quality.code_quality_score = value
+
     @property
     def maintainability_score(self) -> float:
         return self.complexity.maintainability_score
+
+    @maintainability_score.setter
+    def maintainability_score(self, value: float) -> None:
+        self.complexity.maintainability_score = value
 
     @property
     def language_distribution(self) -> Dict[str, int]:

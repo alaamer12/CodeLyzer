@@ -114,10 +114,10 @@ class ProjectMetricsProcessor:
     """Processes project metrics to calculate derived metrics"""
 
     @staticmethod
-    def process_metrics(metrics: ProjectMetrics) -> None:
+    def process(metrics: ProjectMetrics) -> None:
         """Calculate derived metrics and rankings"""
         if not metrics.file_metrics:
-            return
+            return None
 
         # Sort by complexity
         metrics.file_metrics.sort(key=lambda x: x.complexity_score, reverse=True)
@@ -134,6 +134,8 @@ class ProjectMetricsProcessor:
 
         # Quality scores
         Scoring.calculate_quality_scores(metrics)
+        
+        return None
 
 
 class Scoring:
@@ -209,7 +211,7 @@ class Scoring:
             issue_density = total_issues / metrics.total_sloc
             # Normalize and scale to a 0-100 score. The scaling factor can be tuned.
             # A lower factor means quality drops slower.
-            quality_score = 100 * (1 - min(1, issue_density * 5))
+            quality_score = 100 * (1 - min(1.0, issue_density * 5))
             metrics.code_quality.code_quality_score = max(0.0, quality_score)
         elif total_issues > 0:
             # If no code, but issues found (e.g. in config files), penalize heavily
@@ -231,6 +233,46 @@ class Scoring:
         if valid_cc_files:
             metrics.complexity.avg_cyclomatic_complexity = sum(f.cyclomatic_complexity for f in valid_cc_files) / len(
                 valid_cc_files)
+
+    @staticmethod
+    def calculate_code_quality_score(project_metrics: ProjectMetrics) -> float:
+        """Calculate and return the code quality score for the project"""
+        # If already calculated, return the existing value
+        if project_metrics.code_quality.code_quality_score != 100.0:  # Default value is 100.0
+            return project_metrics.code_quality.code_quality_score
+            
+        # Calculate code quality score (based on code smells and security issues)
+        total_issues = sum(len(file_metrics.security_issues) + len(file_metrics.code_smells_list)
+                        for file_metrics in project_metrics.file_metrics)
+                        
+        if project_metrics.total_sloc > 0:
+            # Calculate an issue density score
+            issue_density = total_issues / project_metrics.total_sloc
+            # Normalize and scale to a 0-100 score
+            quality_score = 100 * (1 - min(1.0, issue_density * 5))
+            return max(0.0, quality_score)
+        elif total_issues > 0:
+            # If no code, but issues found, penalize heavily
+            return 0.0
+        else:
+            # No issues and no code
+            return 100.0
+
+    @staticmethod
+    def calculate_maintainability_score(project_metrics: ProjectMetrics) -> float:
+        """Calculate and return the maintainability score for the project"""
+        # If already calculated, return the existing value
+        if project_metrics.complexity.maintainability_score != 0.0:  # Default value is 0.0
+            return project_metrics.complexity.maintainability_score
+            
+        # Calculate maintainability score
+        valid_files = [f for f in project_metrics.file_metrics if
+                    hasattr(f.complexity, 'maintainability_index') and f.complexity.maintainability_index > 0]
+        if valid_files:
+            avg_maintainability = sum(f.maintainability_index for f in valid_files) / len(valid_files)
+            return max(0, min(100, int(avg_maintainability)))
+        
+        return 0.0
 
     @staticmethod
     def identify_hotspots(metrics: ProjectMetrics) -> None:

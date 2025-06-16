@@ -28,7 +28,7 @@ install_rich_traceback()
 # Configure the rich console for standard output
 console = Console()
 
-# Configure rich handler for console output
+# Configure rich handler for console output (will not be used in the root logger)
 rich_handler = RichHandler(
     console=console,
     rich_tracebacks=True,
@@ -47,11 +47,11 @@ file_handler.setFormatter(
     )
 )
 
-# Configure root logger
+# Configure root logger to log only to file (not to terminal)
 logging.basicConfig(
     level=logging.INFO,
-    handlers=[rich_handler, file_handler],
-    format="%(message)s",  # The rich handler will handle the formatting for console
+    handlers=[file_handler],  # Removed rich_handler to log only to file
+    format="%(message)s",
 )
 
 # Create dedicated logger for CodeLyzer
@@ -64,7 +64,7 @@ F = TypeVar('F', bound=Callable[..., Any])
 
 def debug_log(message: str) -> None:
     """Log a debug message if DEBUG mode is enabled.
-    
+
     Args:
         message: The debug message to log
     """
@@ -74,10 +74,10 @@ def debug_log(message: str) -> None:
 
 def debug(func: F) -> F:
     """Decorator to log function entry, exit, and execution time if DEBUG is True.
-    
+
     Args:
         func: The function to decorate
-        
+
     Returns:
         The decorated function
     """
@@ -112,7 +112,7 @@ def debug(func: F) -> F:
 
 def set_log_level(level: int) -> None:
     """Set the log level for the codelyzer logger.
-    
+
     Args:
         level: The log level to set (e.g., logging.DEBUG, logging.INFO)
     """
@@ -122,7 +122,7 @@ def set_log_level(level: int) -> None:
 
 def get_log_file_path() -> Path:
     """Get the current log file path.
-    
+
     Returns:
         Path object pointing to the current log file
     """
@@ -252,10 +252,10 @@ def create_table_columns(table: Table, columns: Dict[str, Dict[str, Any]]) -> Ta
 
 def _get_file_relative_path(file_path: str) -> str:
     """Get a readable relative path for display.
-    
+
     Args:
         file_path: The absolute file path
-        
+
     Returns:
         A simplified relative path for display
     """
@@ -277,10 +277,10 @@ def _get_file_relative_path(file_path: str) -> str:
 
 def _get_issue_style(issue_count: int) -> str:
     """Determine the style color based on issue count.
-    
+
     Args:
         issue_count: Number of issues in the file
-        
+
     Returns:
         Style color name
     """
@@ -294,11 +294,11 @@ def _get_issue_style(issue_count: int) -> str:
 
 def _get_issue_display(issue_count: int, style: str) -> str:
     """Format the issue display with appropriate styling.
-    
+
     Args:
         issue_count: Number of issues in the file
         style: Style color to use
-        
+
     Returns:
         Formatted issue string
     """
@@ -308,7 +308,7 @@ def _get_issue_display(issue_count: int, style: str) -> str:
 
 def _create_hotspots_table_columns() -> Dict[str, Dict[str, Any]]:
     """Define the columns for the hotspots table.
-    
+
     Returns:
         Dictionary of column configurations
     """
@@ -322,10 +322,10 @@ def _create_hotspots_table_columns() -> Dict[str, Dict[str, Any]]:
 
 def _build_file_metrics_map(metrics: ProjectMetrics) -> Dict[str, Any]:
     """Create a mapping of file paths to their metrics for quick lookup.
-    
+
     Args:
         metrics: Project metrics data
-        
+
     Returns:
         Dictionary mapping file paths to FileMetrics objects
     """
@@ -448,6 +448,8 @@ def create_and_display_layout(metrics: ProjectMetrics) -> None:
     )
 
     console.print(layout)
+    
+    return None
 
 
 @debug
@@ -469,6 +471,8 @@ def display_initial_info(project_path: Path, exclude: List[str], include_tests: 
 
     if include_tests:
         console.print("[yellow]🧪 Including test directories[/yellow]")
+    
+    return None
 
 
 @debug
@@ -493,6 +497,8 @@ def display_final_summary(metrics: ProjectMetrics) -> None:
 🎯 Focus on the {len(metrics.most_complex_files)} most complex files for maximum impact
 📝 Log file: {LOG_FILENAME}
 """)
+    
+    return None
 
 
 @debug
@@ -518,6 +524,8 @@ def display_verbose_info(metrics: ProjectMetrics) -> None:
     console.print()
 
     display_security_issues(metrics)
+    
+    return None
 
 
 @debug
@@ -544,3 +552,5 @@ def display_security_issues(metrics: ProjectMetrics) -> None:
 
         console.print(security_table)
         console.print()
+    
+    return None
