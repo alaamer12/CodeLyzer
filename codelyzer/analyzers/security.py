@@ -39,9 +39,6 @@ class SecurityAnalyzer(MetricProvider):
             self._analyze_js_security(file_metrics, file_content, ast_data)
         else:
             debug_log(f"No specific security analyzer for language: {language}")
-        else:
-            debug_log(f"No specific security analyzer for language: {language}")
-        # Add other languages as needed
 
     @debug
     @debug

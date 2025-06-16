@@ -10,7 +10,6 @@ import json
 import os
 import time
 from typing import Dict, List, Set, Optional, Tuple
-from typing import Dict, List, Set, Optional, Tuple
 
 import pandas as pd
 
@@ -23,20 +22,14 @@ from codelyzer.console import (
     console, create_analysis_progress_bar, create_finding_files_progress_bar,
     logger, debug, debug_log
 )
-from codelyzer.console import (
-    console, create_analysis_progress_bar, create_finding_files_progress_bar,
-    logger, debug, debug_log
-)
 from codelyzer.helpers import StandardFileDiscovery, ProjectMetricsProcessor, Scoring
 from codelyzer.metrics import FileMetrics, ProjectMetrics, create_file_metrics
 from codelyzer.utils import FunctionWithTimeout
 
 
 @debug
-@debug
 def register_metric_providers() -> None:
     """Register all metric providers to the ASTAnalyzer base class"""
-    logger.info("Registering metric providers")
     logger.info("Registering metric providers")
 
     # Register each provider
@@ -48,7 +41,6 @@ def register_metric_providers() -> None:
     logger.debug("All metric providers registered successfully")
 
 
-@debug
 @debug
 def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
     """Initialize analyzers for different languages (strategy pattern)"""
@@ -93,7 +85,6 @@ def initialize_analyzers() -> Dict[str, ASTAnalyzer]:
 
         except Exception as e:
             logger.warning(f"{language.capitalize()} analyzer not available: {str(e)}")
-            logger.warning(f"{language.capitalize()} analyzer not available: {str(e)}")
             console.print(f"[yellow]Warning: {language.capitalize()} analyzer not available: {str(e)}[/yellow]")
 
     logger.info(f"Initialized {len(analyzers)} language analyzers")
@@ -108,11 +99,6 @@ def get_file_size(file_path: str) -> int:
         return size
     except OSError as e:
         logger.warning(f"Failed to get file size for {file_path}: {str(e)}")
-        size = os.path.getsize(file_path)
-        debug_log(f"File size for {file_path}: {size} bytes")
-        return size
-    except OSError as e:
-        logger.warning(f"Failed to get file size for {file_path}: {str(e)}")
         return 0
 
 
@@ -120,11 +106,6 @@ def read_content(file_path: str) -> Optional[str]:
     """Read file content safely"""
     try:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
-            debug_log(f"Read {len(content)} chars from {file_path}")
-            return content
-    except Exception as e:
-        logger.warning(f"Failed to read content from {file_path}: {str(e)}")
             content = f.read()
             debug_log(f"Read {len(content)} chars from {file_path}")
             return content
@@ -158,21 +139,17 @@ class AdvancedCodeAnalyzer:
         # Initialize language-specific analyzers
         self.language_analyzers = initialize_analyzers()
         logger.info("AdvancedCodeAnalyzer initialization complete")
-        logger.info("AdvancedCodeAnalyzer initialization complete")
 
-    @debug
     @debug
     def analyze_file(self, file_path: str) -> Optional[FileMetrics]:
         """Analyze a single file using the appropriate analyzer"""
         try:
             if not self._should_analyze_file(file_path):
                 debug_log(f"Skipping file: {file_path}")
-                debug_log(f"Skipping file: {file_path}")
                 return None
 
             language = self.file_discovery.detect_language(file_path)
             file_size = get_file_size(file_path)
-            logger.debug(f"Analyzing file: {file_path} (language: {language}, size: {file_size})")
             logger.debug(f"Analyzing file: {file_path} (language: {language}, size: {file_size})")
 
             metrics, content = self._get_file_metrics_and_content(file_path, language, file_size)
@@ -180,7 +157,6 @@ class AdvancedCodeAnalyzer:
             # If an AST analyzer was used, it already ran all metric providers.
             # Otherwise, run the remaining analyzers for non-AST (e.g., pattern-based) analysis.
             if metrics and content and not self.language_analyzers.get(language):
-                logger.debug(f"Applying additional analysis for {file_path}")
                 logger.debug(f"Applying additional analysis for {file_path}")
                 self._apply_additional_analysis(file_path, content, metrics)
 
@@ -191,13 +167,11 @@ class AdvancedCodeAnalyzer:
 
         except Exception as e:
             logger.error(f"Error analyzing file {file_path}: {str(e)}", exc_info=True)
-            logger.error(f"Error analyzing file {file_path}: {str(e)}", exc_info=True)
             return self._create_fallback_metrics(file_path, e)
 
     def _should_analyze_file(self, file_path: str) -> bool:
         """Check if the file should be analyzed"""
         if not self.file_discovery.should_include_file(file_path):
-            debug_log(f"File excluded by pattern: {file_path}")
             debug_log(f"File excluded by pattern: {file_path}")
             return False
 
@@ -209,8 +183,6 @@ class AdvancedCodeAnalyzer:
 
     @debug
     def _get_file_metrics_and_content(self, file_path: str, language: str, file_size: int) -> Tuple[
-    @debug
-    def _get_file_metrics_and_content(self, file_path: str, language: str, file_size: int) -> Tuple[
                                     Optional[FileMetrics], Optional[str]]:
         """Get metrics and content for a file using appropriate analyzer"""
         analyzer = self.language_analyzers.get(language)
@@ -218,7 +190,6 @@ class AdvancedCodeAnalyzer:
         metrics = None
 
         if analyzer:
-            logger.debug(f"Using {language} AST analyzer for {file_path}")
             logger.debug(f"Using {language} AST analyzer for {file_path}")
             metrics = analyzer.analyze_file(file_path)
             if metrics:
@@ -237,7 +208,6 @@ class AdvancedCodeAnalyzer:
     def _apply_additional_analysis(self, file_path: str, content: str, metrics: FileMetrics) -> None:
         """Apply additional analyzers to the file content"""
         logger.debug(f"Applying security analysis to {file_path}")
-        logger.debug(f"Applying security analysis to {file_path}")
         self.security_analyzer.analyze_file(metrics, content, None)
 
         logger.debug(f"Applying code smell analysis to {file_path}")
@@ -249,7 +219,6 @@ class AdvancedCodeAnalyzer:
     def _create_fallback_metrics(self, file_path: str, error: Exception) -> FileMetrics:
         """Create minimal metrics when analysis fails"""
         logger.warning(f"Creating fallback metrics for {file_path} due to error: {str(error)}")
-        logger.warning(f"Creating fallback metrics for {file_path} due to error: {str(error)}")
         console.print(f"[yellow]Warning: Error analyzing {file_path}: {str(error)}[/yellow]")
         language = self.file_discovery.detect_language(file_path) or "unknown"
         metrics = create_file_metrics(file_path, language)
@@ -258,10 +227,8 @@ class AdvancedCodeAnalyzer:
         return metrics
 
     @debug
-    @debug
     def analyze_project(self, project_path: str) -> ProjectMetrics:
         """Analyze entire project"""
-        logger.info(f"Starting project analysis: {project_path}")
         logger.info(f"Starting project analysis: {project_path}")
         start_time = time.time()
         project_metrics = ProjectMetrics()
@@ -271,7 +238,6 @@ class AdvancedCodeAnalyzer:
 
         # Handle empty file list
         if not all_files:
-            logger.warning("No files found to analyze")
             logger.warning("No files found to analyze")
             console.print("[yellow]No files to analyze[/yellow]")
             return project_metrics
@@ -292,10 +258,8 @@ class AdvancedCodeAnalyzer:
         return project_metrics
 
     @debug
-    @debug
     def _discover_project_files(self, project_path: str) -> List[str]:
         """Discover files to analyze in the project"""
-        logger.info(f"Discovering files in: {project_path}")
         logger.info(f"Discovering files in: {project_path}")
         finding_files_progress = create_finding_files_progress_bar()
         with finding_files_progress as progress:
@@ -310,7 +274,6 @@ class AdvancedCodeAnalyzer:
     def _process_files_with_progress(self, all_files: List[str], project_metrics: ProjectMetrics,
                                      start_time: float) -> None:
         """Process all files with progress tracking"""
-        logger.info(f"Processing {len(all_files)} files with progress tracking")
         logger.info(f"Processing {len(all_files)} files with progress tracking")
         with create_analysis_progress_bar() as progress:
             task = progress.add_task("[cyan]Analyzing files...", total=len(all_files))
@@ -328,6 +291,8 @@ class AdvancedCodeAnalyzer:
                 metrics = self._analyze_file_with_timeout(file_path)
 
                 if metrics:
+                    # Update aggregate metrics (important fix - was missing)
+                    self.scoring.update_aggregate_metrics(project_metrics, metrics)
                     self._update_project_metrics(project_metrics, metrics, language_stats)
 
                     # Show periodic stats
@@ -341,7 +306,6 @@ class AdvancedCodeAnalyzer:
     @debug
     def _analyze_file_with_timeout(self, file_path: str) -> Optional[FileMetrics]:
         """Analyze a file with timeout protection"""
-        debug_log(f"Analyzing with timeout: {file_path}")
         debug_log(f"Analyzing with timeout: {file_path}")
 
         def analyze_with_timeout():
@@ -400,7 +364,6 @@ class AdvancedCodeAnalyzer:
     @staticmethod
     def _show_progress_stats(current: int, total: int, start_time: float, language_stats: Dict) -> None:
         """Show progress statistics during analysis"""
-        """Show progress statistics during analysis"""
         elapsed = time.time() - start_time
         files_per_second = current / elapsed if elapsed > 0 else 0
         percent_done = (current / total) * 100 if total > 0 else 0
@@ -422,14 +385,11 @@ class AdvancedCodeAnalyzer:
 
 class ReportExport:
     """Export analysis results to various formats"""
-    """Export analysis results to various formats"""
 
     def __init__(self, metrics: ProjectMetrics, output_path: str):
         """Initialize with metrics and output path"""
-        """Initialize with metrics and output path"""
         self.metrics = metrics
         self.output_path = output_path
-        logger.info(f"Initializing report export to: {output_path}")
         logger.info(f"Initializing report export to: {output_path}")
 
     def _prepare_report_data(self) -> Dict:
@@ -493,13 +453,7 @@ class ReportExport:
             console.print(f"[red]Error exporting to JSON: {str(e)}[/red]")
 
     @debug
-    @debug
     def to_df(self) -> pd.DataFrame:
-        """Convert file metrics to pandas DataFrame"""
-        logger.debug("Converting metrics to DataFrame")
-        report_data = self._prepare_report_data()
-        df = pd.DataFrame(report_data["files"])
-        return df
         """Convert file metrics to pandas DataFrame"""
         logger.debug("Converting metrics to DataFrame")
         report_data = self._prepare_report_data()

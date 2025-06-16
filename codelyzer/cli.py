@@ -14,11 +14,6 @@ from codelyzer.console import (
     display_verbose_info, create_and_display_layout, logger, debug, debug_log,
     set_log_level
 )
-from codelyzer.console import (
-    console, create_summary_panel, display_initial_info, display_final_summary,
-    display_verbose_info, create_and_display_layout, logger, debug, debug_log,
-    set_log_level
-)
 from codelyzer.core import AdvancedCodeAnalyzer, ReportExport
 
 app = typer.Typer(
@@ -29,12 +24,10 @@ app = typer.Typer(
 
 
 @debug
-@debug
 def validate_project_path(path: str) -> Path:
     """Validate the provided path and return a Path object."""
     project_path = Path(path).resolve()
     if not project_path.exists() or not project_path.is_dir():
-        logger.error(f"Invalid directory path: {path}")
         logger.error(f"Invalid directory path: {path}")
         console.print(f"[red]❌ Path '{path}' is not a valid directory[/red]")
         raise typer.Exit(1)
@@ -46,15 +39,11 @@ def generate_reports(metrics, output_format: str, output_dir: str, project_path:
     logger.info(f"Generating reports in format: {output_format}")
     debug_log(f"Output directory: {output_dir}")
     
-    logger.info(f"Generating reports in format: {output_format}")
-    debug_log(f"Output directory: {output_dir}")
-    
     if output_format in ["html", "all"]:
         output_path = Path(output_dir)
         output_path.mkdir(exist_ok=True)
 
         html_file = output_path / f"{project_path.name}_analysis.html"
-        logger.info(f"Generating HTML report: {html_file}")
         logger.info(f"Generating HTML report: {html_file}")
 
         # Generate HTML content using our direct method and pass the output directory
@@ -72,9 +61,7 @@ def generate_reports(metrics, output_format: str, output_dir: str, project_path:
 
         json_file = output_path / f"{project_path.name}_analysis.json"
         logger.info(f"Generating JSON report: {json_file}")
-        logger.info(f"Generating JSON report: {json_file}")
         ReportExport(metrics, str(json_file)).to_json()
-        logger.info(f"JSON report saved to {json_file}")
         logger.info(f"JSON report saved to {json_file}")
         console.print(f"[green]✅ JSON report saved:[/green] [link]{json_file}[/link]")
 
@@ -87,23 +74,13 @@ def analyze(
         output_format: str = typer.Option("terminal", "--format", "-f",
                                           help="📄 Output format: terminal, html, json, all"),
         output_dir: str = typer.Option("reports", "--output", "-o", help="📂 Output directory for reports"),
-        verbose: bool = typer.Option(False, "--verbose", "-v", help="�� Verbose output"),
+        verbose: bool = typer.Option(False, "--verbose", "-v", help=" Verbose output"),
         no_about: bool = typer.Option(False, "--no-about", help="📄 Do not include about page in HTML report"),
         debug_mode: bool = typer.Option(False, "--debug", "-d", help="🐛 Enable debug logging"),
 ):
     """
     🚀 Analyze your codebase with advanced metrics and beautiful reports
     """
-    # Set log level based on verbose/debug flags
-    if debug_mode:
-        set_log_level(logging.DEBUG)
-        logger.debug("Debug mode enabled")
-    elif verbose:
-        set_log_level(logging.INFO)
-        logger.info("Verbose mode enabled")
-
-    logger.info(f"Starting analysis of {path}")
-    logger.info(f"CLI options: exclude={exclude}, include_tests={include_tests}, output_format={output_format}")
     # Set log level based on verbose/debug flags
     if debug_mode:
         set_log_level(logging.DEBUG)
@@ -123,7 +100,6 @@ def analyze(
 
     # Initialize analyzer
     logger.info("Initializing code analyzer")
-    logger.info("Initializing code analyzer")
     analyzer = AdvancedCodeAnalyzer(
         exclude_dirs=set(exclude) if exclude else None,
         include_tests=include_tests
@@ -131,11 +107,9 @@ def analyze(
 
     # Direct call to analyzer - let it handle its own progress
     logger.info(f"Analyzing project: {project_path}")
-    logger.info(f"Analyzing project: {project_path}")
     metrics = analyzer.analyze_project(str(project_path))
 
     if metrics.total_files == 0:
-        logger.error("No supported files found in the specified directory")
         logger.error("No supported files found in the specified directory")
         console.print("[red]❌ No supported files found in the specified directory[/red]")
         raise typer.Exit(1)
@@ -145,18 +119,15 @@ def analyze(
 
     # Summary panel
     logger.info("Displaying summary panel")
-    logger.info("Displaying summary panel")
     console.print(create_summary_panel(metrics))
     console.print()
 
     # Create and display layout with tables
     logger.info("Displaying metrics tables")
-    logger.info("Displaying metrics tables")
     create_and_display_layout(metrics)
 
     # Additional verbose information
     if verbose:
-        logger.info("Displaying verbose metrics information")
         logger.info("Displaying verbose metrics information")
         display_verbose_info(metrics)
 
@@ -172,19 +143,11 @@ def compare(
         path1: str = typer.Argument(..., help="🎯 First project path"),
         path2: str = typer.Argument(..., help="🎯 Second project path"),
         exclude: List[str] = typer.Option([], "--exclude", "-e", help="📁 Directories to exclude"),
-        debug_mode: bool = typer.Option(False, "--debug", "-d", help="🐛 Enable debug logging"),
-        debug_mode: bool = typer.Option(False, "--debug", "-d", help="🐛 Enable debug logging"),
+        debug_mode: bool = typer.Option(False, "--debug", "-d", help="🐛 Enable debug logging")
 ):
     """
     ⚖️ Compare two codebases side by side
     """
-    # Set log level if debug mode is enabled
-    if debug_mode:
-        set_log_level(logging.DEBUG)
-        logger.debug("Debug mode enabled for comparison")
-    
-    logger.info(f"Starting comparison between {path1} and {path2}")
-    
     # Set log level if debug mode is enabled
     if debug_mode:
         set_log_level(logging.DEBUG)
@@ -199,22 +162,18 @@ def compare(
 
     # Analyze both projects
     logger.info("Initializing code analyzer for comparison")
-    logger.info("Initializing code analyzer for comparison")
     analyzer = AdvancedCodeAnalyzer(exclude_dirs=set(exclude) if exclude else None)
 
     # Avoid nested live displays
-    logger.info(f"Analyzing first project: {path1}")
     logger.info(f"Analyzing first project: {path1}")
     console.print("[bold green]🔄 Analyzing first project...[/bold green]")
     metrics1 = analyzer.analyze_project(path1)
 
     logger.info(f"Analyzing second project: {path2}")
-    logger.info(f"Analyzing second project: {path2}")
     console.print("[bold green]🔄 Analyzing second project...[/bold green]")
     metrics2 = analyzer.analyze_project(path2)
 
     # Create comparison table
-    logger.info("Creating comparison table")
     logger.info("Creating comparison table")
     comparison_table = Table(title="📊 Project Comparison", box=box.ROUNDED)
     comparison_table.add_column("Metric", style="cyan", no_wrap=True)
@@ -252,11 +211,8 @@ def compare(
         )
         
         logger.debug(f"Comparison - {label}: {val1} vs {val2}, diff: {diff}")
-        
-        logger.debug(f"Comparison - {label}: {val1} vs {val2}, diff: {diff}")
 
     console.print(comparison_table)
-    logger.info("Comparison complete")
     logger.info("Comparison complete")
 
 
@@ -265,8 +221,6 @@ def languages():
     """
     🌐 Show supported programming languages
     """
-    logger.info("Displaying supported languages information")
-    
     logger.info("Displaying supported languages information")
     
     console.print(Panel.fit(
@@ -284,14 +238,11 @@ def languages():
         features = "AST Analysis" if lang == "python" else "Pattern Matching"
         lang_table.add_row(lang.title(), extensions, features)
         logger.debug(f"Language support: {lang.title()} - Extensions: {extensions}")
-        logger.debug(f"Language support: {lang.title()} - Extensions: {extensions}")
 
     console.print(lang_table)
 
 
 def main():
-    # Import logging here to avoid circular imports
-    import logging
     # Import logging here to avoid circular imports
     import logging
     # Just call app() to fix pyproject.toml script section
